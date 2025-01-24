@@ -1,5 +1,6 @@
-import { Button } from "@/components/ui/button";
-import { ChatMessage } from "@/types/chat";
+'use client';
+
+import { ChatMessage } from "@/stores/chat-store";
 
 interface TradeUpdateProps {
   message: ChatMessage;
@@ -9,31 +10,16 @@ export function TradeUpdate({ message }: TradeUpdateProps) {
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       <p className="text-sm text-foreground-secondary mb-2">TRADE_UPDATE</p>
-      <p className="text-foreground">{message.content}</p>
-      {message.metadata.tradeId && (
-        <p className="text-xs text-foreground-secondary mt-1">
+      <p className="text-foreground mb-2">{message.content}</p>
+      {message.metadata?.tradeId && (
+        <p className="text-sm text-foreground-secondary">
           Trade ID: {message.metadata.tradeId}
         </p>
       )}
-      {message.metadata.rateSnapshot && (
-        <p className="text-xs text-foreground-secondary">
+      {message.metadata?.rateSnapshot && (
+        <p className="text-sm text-success">
           Rate: {message.metadata.rateSnapshot}
         </p>
-      )}
-      {message.metadata.actions && (
-        <div className="mt-3 flex space-x-3">
-          {message.metadata.actions.map((action) => (
-            <Button
-              key={action.id}
-              size="sm"
-              variant={action.style === 'PRIMARY' ? 'default' : 'secondary'}
-              disabled={action.disabled}
-              className={action.loading ? 'opacity-50 cursor-not-allowed' : ''}
-            >
-              {action.label}
-            </Button>
-          ))}
-        </div>
       )}
     </div>
   );

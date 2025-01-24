@@ -1,36 +1,38 @@
+'use client';
+
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/chat/message";
 import { QuickActions } from "@/components/chat/quick-actions";
-
-// Example messages for demonstration
-const exampleMessages = [
-  {
-    id: '1',
-    type: 'SYSTEM_MESSAGE',
-    content: 'Welcome to Sendr! Start by selecting an action below or type a command.',
-    timestamp: new Date(),
-    metadata: {
-      status: 'DELIVERED'
-    }
-  }
-] as const;
+import { useChatStore } from "@/stores/chat-store";
+import { useEffect } from "react";
 
 export default function DashboardPage() {
+  const { messages, addSystemMessage } = useChatStore();
+
+  useEffect(() => {
+    // Only add welcome message if there are no messages
+    if (messages.length === 0) {
+      addSystemMessage('Welcome to Sendr! Select an action or type a command to get started.');
+    }
+  }, []);
+
   return (
     <div className="flex h-full">
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col relative">
         {/* Message List */}
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
-          {exampleMessages.map((message) => (
-            <ChatMessage key={message.id} message={message} />
-          ))}
+        <div className="flex-1 overflow-y-auto">
+          <div className="space-y-4 p-4">
+            {messages.map((message) => (
+              <ChatMessage key={message.id} message={message} />
+            ))}
+          </div>
         </div>
 
-        {/* Quick Actions and Input */}
-        <div>
+        {/* Quick Actions and Input Area */}
+        <div className="border-t border-border bg-background">
           <QuickActions />
-          <div className="border-t border-border bg-background p-4">
+          <div className="border-t border-border p-4">
             <div className="flex space-x-3">
               <input
                 type="text"

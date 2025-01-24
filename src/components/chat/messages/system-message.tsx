@@ -1,4 +1,6 @@
-import { ChatMessage } from "@/types/chat";
+'use client';
+
+import { ChatMessage } from "@/stores/chat-store";
 
 interface SystemMessageProps {
   message: ChatMessage;

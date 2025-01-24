@@ -1,82 +1,84 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
-import { ArrowUpDown, Search, Star, Clock, LineChart, History, Bell } from "lucide-react";
-
-const actions = [
-  { id: 1, icon: ArrowUpDown, label: "New Trade" },
-  { id: 2, icon: LineChart, label: "Popular Pairs" },
-  { id: 3, icon: Search, label: "Search Pairs" },
-  { id: 4, icon: Star, label: "Favourites" },
-  { id: 5, icon: Bell, label: "Set Alert" },
-  { id: 6, icon: Clock, label: "Active Trades" },
-  { id: 7, icon: History, label: "History" },
-];
-
-const container = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
-};
-
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { 
-    opacity: 1, 
-    y: 0,
-    transition: {
-      type: "spring",
-      stiffness: 300,
-      damping: 24
-    }
-  }
-};
-
-const hover = {
-  scale: 1.05,
-  y: -5,
-  transition: {
-    type: "spring",
-    stiffness: 400,
-    damping: 10
-  }
-};
+import { useChatStore } from "@/stores/chat-store";
+import { 
+  ArrowRightLeft, 
+  Search, 
+  Star, 
+  Bell, 
+  BarChart2, 
+  History, 
+  TrendingUp 
+} from "lucide-react";
 
 export function QuickActions() {
+  const { addActionPrompt, addSystemMessage } = useChatStore();
+
+  const handleNewTrade = () => {
+    addActionPrompt('Select a currency pair to trade:', [
+      { id: '1', label: 'EUR/USD', action: 'trade', style: 'PRIMARY' },
+      { id: '2', label: 'GBP/USD', action: 'trade', style: 'PRIMARY' },
+      { id: '3', label: 'USD/JPY', action: 'trade', style: 'PRIMARY' },
+    ]);
+  };
+
+  const handlePopularPairs = () => {
+    addSystemMessage(`Current rates for popular pairs:
+EUR/USD: 1.0950 (+0.14%)
+GBP/USD: 1.2750 (+0.20%)
+USD/JPY: 148.25 (-0.10%)`);
+  };
+
+  const handleSearchPairs = () => {
+    addSystemMessage('Type a currency pair to search (e.g., "EUR/USD" or "Bitcoin")');
+  };
+
+  const handleFavorites = () => {
+    addSystemMessage('Your favorite pairs will appear here. Add pairs to your favorites to track them easily.');
+  };
+
+  const handleSetAlert = () => {
+    addActionPrompt('Choose a pair to set an alert for:', [
+      { id: '1', label: 'EUR/USD', action: 'alert', style: 'PRIMARY' },
+      { id: '2', label: 'GBP/USD', action: 'alert', style: 'PRIMARY' },
+      { id: '3', label: 'USD/JPY', action: 'alert', style: 'PRIMARY' },
+    ]);
+  };
+
+  const handleActiveTrades = () => {
+    addSystemMessage('You have no active trades. Use the "New Trade" button to start trading.');
+  };
+
+  const handleHistory = () => {
+    addSystemMessage('Your trading history will appear here once you start making trades.');
+  };
+
+  const actions = [
+    { icon: ArrowRightLeft, label: 'New Trade', onClick: handleNewTrade },
+    { icon: TrendingUp, label: 'Popular Pairs', onClick: handlePopularPairs },
+    { icon: Search, label: 'Search Pairs', onClick: handleSearchPairs },
+    { icon: Star, label: 'Favorites', onClick: handleFavorites },
+    { icon: Bell, label: 'Set Alert', onClick: handleSetAlert },
+    { icon: BarChart2, label: 'Active Trades', onClick: handleActiveTrades },
+    { icon: History, label: 'History', onClick: handleHistory },
+  ];
+
   return (
-    <motion.div
-      variants={container}
-      initial="hidden"
-      animate="show"
-      className="p-2 border-t border-border bg-background/50 backdrop-blur-sm"
-    >
-      <div className="flex flex-wrap gap-2">
-        {actions.map((action) => {
-          const Icon = action.icon;
-          return (
-            <motion.div
-              key={action.id}
-              variants={item}
-              whileHover={hover}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Button
-                size="sm"
-                variant="secondary"
-                className="rounded-full backdrop-blur-sm bg-background/50 border border-border/50 hover:border-primary/50 transition-colors"
-              >
-                <Icon className="w-4 h-4 mr-2" />
-                {action.label}
-              </Button>
-            </motion.div>
-          );
-        })}
+    <div className="w-full bg-background p-2">
+      <div className="flex flex-col space-y-2">
+        {actions.map((action) => (
+          <Button
+            key={action.label}
+            variant="outline"
+            onClick={action.onClick}
+            className="w-fit justify-start space-x-2"
+          >
+            <action.icon className="h-4 w-4" />
+            <span>{action.label}</span>
+          </Button>
+        ))}
       </div>
-    </motion.div>
+    </div>
   );
 }

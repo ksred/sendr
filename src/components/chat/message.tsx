@@ -1,4 +1,6 @@
-import { ChatMessage as ChatMessageType } from "@/types/chat";
+'use client';
+
+import { ChatMessage as ChatMessageType } from "@/stores/chat-store";
 import { SystemMessage } from "./messages/system-message";
 import { RateAlert } from "./messages/rate-alert";
 import { ActionPrompt } from "./messages/action-prompt";
