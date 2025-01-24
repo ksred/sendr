@@ -30,7 +30,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick Actions and Input Area */}
-        <div className="border-t border-border bg-background">
+        <div className="border-t border-border bg-background relative z-40">
           <QuickActions />
           <div className="border-t border-border p-4">
             <div className="flex space-x-3">

@@ -1,5 +1,6 @@
 'use client';
 
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/stores/chat-store";
 import { 
@@ -65,18 +66,25 @@ USD/JPY: 148.25 (-0.10%)`);
   ];
 
   return (
-    <div className="w-full bg-background p-2">
-      <div className="flex flex-col space-y-2">
-        {actions.map((action) => (
-          <Button
+    <div className="w-full bg-background px-4 py-2">
+      <div className="flex flex-col space-y-1.5">
+        {actions.map((action, index) => (
+          <motion.button
             key={action.label}
-            variant="outline"
-            onClick={action.onClick}
-            className="w-fit justify-start space-x-2"
+            className="w-fit"
+            initial={{ x: -20 }}
+            animate={{ x: 0 }}
+            transition={{ delay: index * 0.05 }}
           >
-            <action.icon className="h-4 w-4" />
-            <span>{action.label}</span>
-          </Button>
+            <Button
+              variant="outline"
+              onClick={action.onClick}
+              className="justify-start space-x-2 hover:bg-primary/10 hover:text-primary hover:border-primary/50 transition-all duration-200"
+            >
+              <action.icon className="h-4 w-4" />
+              <span>{action.label}</span>
+            </Button>
+          </motion.button>
         ))}
       </div>
     </div>
