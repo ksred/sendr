@@ -8,274 +8,224 @@
 - User states:
   - Logged out
   - Logged in (active)
-  - Logged in (idle)
-  - In trade
+  - Logged in (executing)
+  - Logged in (monitoring)
 - User preferences persist in PostgreSQL
 - Real-time session syncing across devices
 
-### 2. Chat System
-- Message Types:
-  ```typescript
-  type MessageType = 
-    | 'USER_INPUT'        // Plain text from user
-    | 'SYSTEM_MESSAGE'    // System notifications
-    | 'LLM_RESPONSE'      // AI responses
-    | 'TRADE_UPDATE'      // Trade status changes
-    | 'RATE_ALERT'        // Price notifications
-    | 'ACTION_PROMPT'     // Interactive elements
-  ```
+### 2. LLM Integration System
+```typescript
+interface LLMProcessor {
+  // Intent Analysis
+  analyseIntent: (input: string) => Promise<TradeIntent>;
+  
+  // Strategy Generation
+  generateStrategy: (intent: TradeIntent, context: MarketContext) => Promise<ExecutionStrategy>;
+  
+  // Risk Assessment
+  assessRisk: (strategy: ExecutionStrategy, marketData: MarketData) => Promise<RiskAssessment>;
+  
+  // Market Analysis
+  analyseMarket: (pair: string, depth: MarketDepth) => Promise<MarketAnalysis>;
+}
 
-- Message Components:
-  ```typescript
-  interface ChatMessage {
-    id: string;
-    type: MessageType;
-    content: string;
-    timestamp: Date;
-    metadata: {
-      tradeId?: string;
-      rateSnapshot?: number;
-      actions?: ActionButton[];
-      attachments?: Attachment[];
-      status: 'SENT' | 'DELIVERED' | 'READ';
-      error?: ErrorDetails;
-    };
-  }
-  ```
+interface TradeIntent {
+  goal: 'SINGLE_EXECUTION' | 'SCHEDULED' | 'OPPORTUNISTIC';
+  constraints: {
+    amount: number;
+    deadline?: Date;
+    targetRate?: number;
+    riskTolerance: 'LOW' | 'MEDIUM' | 'HIGH';
+  };
+  context: {
+    marketConditions: MarketConditions;
+    userHistory: UserHistory;
+    positionContext: PositionContext;
+  };
+}
+```
 
-- Interactive Elements:
-  ```typescript
-  interface ActionButton {
-    id: string;
-    label: string;
-    action: 'TRADE' | 'CONFIRM' | 'CANCEL' | 'VIEW_DETAILS';
-    style: 'PRIMARY' | 'SECONDARY' | 'DANGER';
-    disabled?: boolean;
-    loading?: boolean;
-  }
-  ```
-
-### 3. Trading Flow Engine
+### 3. Execution Engine
 - State Machine for Trade Process:
-  ```typescript
-  type TradeState =
-    | 'INIT'              // Starting state
-    | 'PAIR_SELECTION'    // Choosing currencies
-    | 'DIRECTION_SELECT'  // Buy/Sell decision
-    | 'AMOUNT_INPUT'      // Quantity specification
-    | 'RATE_CONFIRM'      // Price confirmation
-    | 'FINAL_REVIEW'      // Summary review
-    | 'PROCESSING'        // Execution
-    | 'COMPLETED'         // Success
-    | 'FAILED'           // Error state
-  ```
-
-- Validation Rules:
-  ```typescript
-  interface ValidationRule {
-    field: string;
-    rule: (value: any) => boolean;
-    errorMessage: string;
-    severity: 'WARNING' | 'ERROR';
-  }
-  ```
-
-### 4. Rate Management
-- Real-time rate streaming
-- Rate refresh intervals:
-  - Active trade: 100ms
-  - Watchlist: 1s
-  - Background: 5s
-- Historical rate caching
-- Rate alerts system
-
-### 5. Balance & Transaction Management
 ```typescript
-interface Balance {
-  currency: string;
-  available: number;
-  held: number;
-  total: number;
-  lastUpdated: Date;
+type ExecutionState =
+  | 'INTENT_ANALYSIS'    // Processing user input
+  | 'STRATEGY_CREATION'  // Generating approach
+  | 'RISK_ASSESSMENT'    // Evaluating risk
+  | 'ORDER_SPLITTING'    // Creating tranches
+  | 'EXECUTION'          // Processing orders
+  | 'MONITORING'         // Tracking progress
+  | 'COMPLETED'          // Finished
+  | 'CANCELLED'         // Terminated
+```
+
+### 4. Market Data Management
+```typescript
+interface MarketDataManager {
+  subscribeToRates: (pairs: string[]) => void;
+  getMarketDepth: (pair: string) => Promise<MarketDepth>;
+  analyseMarketConditions: (pair: string) => Promise<MarketConditions>;
+  getLiquidityProfile: (pair: string) => Promise<LiquidityProfile>;
 }
 
-interface Transaction {
-  id: string;
-  type: 'TRADE' | 'DEPOSIT' | 'WITHDRAWAL';
-  status: TransactionStatus;
-  amount: number;
-  currency: string;
+interface MarketDepth {
+  pair: string;
+  bids: PriceLevel[];
+  asks: PriceLevel[];
   timestamp: Date;
-  relatedTrades?: string[];
-  metadata: Record<string, any>;
+  liquidityScore: number;
 }
 ```
 
-## User Interface States
-
-### 1. Main Chat View
-- Components:
-  - Message list (virtualized)
-  - Input bar
-  - Action buttons
-  - Rate ticker
-  - Balance display
-
-- States:
-  ```typescript
-  interface ChatUIState {
-    loading: boolean;
-    error: Error | null;
-    messages: ChatMessage[];
-    activeTradeId: string | null;
-    showRatePanel: boolean;
-    inputDisabled: boolean;
-    selectedCurrency: string | null;
-  }
-  ```
-
-### 2. Trade Flow
-- Steps:
-  1. Currency Pair Selection
-     - Popular pairs list
-     - Search functionality
-     - Recent pairs
-     - Favourite pairs
-
-  2. Trade Direction
-     - Buy/Sell options
-     - Current rate display
-     - Rate trend indicator
-     - Available balance
-
-  3. Amount Input
-     - Numeric input
-     - Slider control
-     - Quick amount buttons
-     - Maximum available
-     - Equivalent value display
-
-  4. Confirmation
-     - Rate refresh
-     - Final amount
-     - Fees calculation
-     - Total cost
-     - Terms acceptance
-
-### 3. Error Handling
+### 5. Position & Risk Management
 ```typescript
-interface ErrorState {
-  code: string;
-  message: string;
-  recovery?: {
-    type: 'RETRY' | 'FALLBACK' | 'MANUAL';
-    action: () => void;
+interface PositionManager {
+  getCurrentPositions: () => Promise<Positions>;
+  calculateExposure: (positions: Positions) => Exposure;
+  monitorRiskLimits: (positions: Positions) => RiskMetrics;
+  trackPositionChanges: (positions: Positions) => PositionUpdates;
+}
+
+interface Position {
+  currency: string;
+  amount: number;
+  valuationUSD: number;
+  unrealizedPnL: number;
+  exposure: Exposure;
+}
+```
+
+## API Endpoints
+
+### 1. Trade Management
+```typescript
+// Trade Endpoints
+POST   /api/v1/trades/analyse      // Analyse trade intent
+POST   /api/v1/trades/execute      // Execute trade strategy
+GET    /api/v1/trades/:id          // Get trade details
+GET    /api/v1/trades/active       // List active trades
+PATCH  /api/v1/trades/:id          // Modify trade
+DELETE /api/v1/trades/:id          // Cancel trade
+
+// Position Endpoints
+GET    /api/v1/positions           // Get current positions
+GET    /api/v1/positions/history   // Get position history
+GET    /api/v1/positions/exposure  // Get exposure analysis
+
+// Market Data Endpoints
+GET    /api/v1/market/rates        // Get current rates
+GET    /api/v1/market/depth        // Get market depth
+GET    /api/v1/market/analysis     // Get market analysis
+```
+
+### 2. WebSocket Events
+```typescript
+interface WebSocketEvents {
+  // Market Updates
+  RATE_UPDATE: {
+    pair: string;
+    rate: number;
+    timestamp: Date;
   };
-  userMessage: string;
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  
+  // Execution Updates
+  TRADE_UPDATE: {
+    tradeId: string;
+    status: ExecutionState;
+    progress: number;
+  };
+  
+  // Position Updates
+  POSITION_UPDATE: {
+    currency: string;
+    amount: number;
+    timestamp: Date;
+  };
 }
 ```
 
-## Data Management
+## State Management
 
-### 1. Local Storage Structure
+### 1. Client State
 ```typescript
-interface LocalState {
+interface ClientState {
   user: {
+    profile: UserProfile;
     preferences: UserPreferences;
-    recentSearches: string[];
-    favouritePairs: string[];
-    lastViewedTrades: string[];
+    limits: TradingLimits;
   };
-  cache: {
-    rates: Record<string, RateCache>;
-    messages: Record<string, ChatMessage>;
-    trades: Record<string, TradeCache>;
+  trades: {
+    active: Trade[];
+    history: TradeHistory;
+    templates: TradeTemplate[];
+  };
+  market: {
+    rates: RateCache;
+    analysis: MarketAnalysis;
+    alerts: Alert[];
   };
   ui: {
     theme: 'light' | 'dark';
-    fontSize: number;
-    notifications: NotificationSettings;
+    executionPanel: ExecutionPanelState;
+    notifications: NotificationState;
   };
 }
 ```
 
-### 2. State Management
-- React Query for server state
-- Zustand for UI state
-- Local storage for preferences
-- WebSocket for real-time updates
-
-### 3. Caching Strategy
-- Rate caching: 5-minute sliding window
-- Message history: 100 most recent
-- Trade details: 24-hour cache
-- User preferences: Indefinite with version control
-
-## Event System
-
-### 1. WebSocket Events
+### 2. Server State
 ```typescript
-type WebSocketEvent =
-  | { type: 'RATE_UPDATE'; payload: RateUpdate }
-  | { type: 'TRADE_STATUS'; payload: TradeStatus }
-  | { type: 'BALANCE_UPDATE'; payload: BalanceUpdate }
-  | { type: 'SYSTEM_NOTIFICATION'; payload: Notification }
-```
-
-### 2. User Actions
-```typescript
-type UserAction =
-  | { type: 'START_TRADE'; payload: TradePair }
-  | { type: 'CONFIRM_AMOUNT'; payload: TradeAmount }
-  | { type: 'CANCEL_TRADE'; payload: TradeId }
-  | { type: 'SEND_MESSAGE'; payload: MessageContent }
-```
-
-## LLM Integration
-
-### 1. Context Management
-```typescript
-interface LLMContext {
-  userHistory: TradeHistory;
-  currentState: TradeState;
-  availableActions: Action[];
-  marketConditions: MarketData;
-  userPreferences: UserPreferences;
+interface ServerState {
+  sessions: {
+    active: Session[];
+    trades: ActiveTrade[];
+    subscriptions: MarketSubscription[];
+  };
+  cache: {
+    rates: RateCache;
+    depth: DepthCache;
+    analysis: AnalysisCache;
+  };
+  monitoring: {
+    systemHealth: HealthMetrics;
+    executionMetrics: ExecutionMetrics;
+    errorRates: ErrorMetrics;
+  };
 }
 ```
 
-### 2. Response Templates
-- Standard responses
-- Error handling
-- Clarification requests
-- Confirmation messages
-- Educational content
+## Error Handling
+```typescript
+interface ErrorHandler {
+  handleExecutionError: (error: ExecutionError) => ErrorResponse;
+  handleMarketDataError: (error: MarketDataError) => ErrorResponse;
+  handleLLMError: (error: LLMError) => ErrorResponse;
+  handleWebSocketError: (error: WebSocketError) => ErrorResponse;
+}
 
-### 3. Action Triggers
-- Market condition alerts
-- User guidance
-- Error explanation
-- Trade suggestions
-- Risk warnings
+interface ErrorResponse {
+  code: string;
+  message: string;
+  userMessage: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  recovery?: RecoveryAction;
+}
+```
 
-## Performance Optimizations
+## Performance Considerations
 
-### 1. Loading States
-- Skeleton screens for:
-  - Message history
-  - Rate panels
-  - Trade forms
-  - Balance updates
+### 1. Optimization Strategies
+- Rate caching with WebSocket updates
+- Efficient market depth processing
+- LLM response caching for similar intents
+- Position calculation optimization
+- Execution engine performance tuning
 
-### 2. Lazy Loading
-- Message history pagination
-- Dynamic component imports
-- Image optimization
-- Font subsetting
+### 2. Monitoring Metrics
+- Response times for intent analysis
+- Execution completion rates
+- Market data latency
+- WebSocket message rates
+- Error frequencies
+- System resource utilization
 
-### 3. Caching Strategy
-- Rate data caching
-- Message history
-- User preferences
-- Trade templates
+This specification focuses on creating a sophisticated forex trading platform with natural language understanding capabilities while maintaining high performance and reliability.

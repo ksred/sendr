@@ -50,6 +50,9 @@ const config: Config = {
           DEFAULT: 'rgba(255, 255, 255, 0.05)',
           foreground: '#FFFFFF',
         },
+        navy: "#1E293B",
+        electric: "#3B82F6",
+        mint: "#34D399",
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
@@ -59,6 +62,9 @@ const config: Config = {
         lg: '0.75rem',
         md: '0.5rem',
         sm: '0.25rem',
+      },
+      spacing: {
+        'safe': 'env(safe-area-inset-bottom)',
       },
       keyframes: {
         'accordion-down': {
