@@ -157,6 +157,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const initialMessageProcessed = useRef(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -164,25 +165,30 @@ export default function ChatPage() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isLoading]); // Scroll when messages change or loading state changes
+  }, [messages, isLoading]);
 
-  useEffect(() => {
-    const initialMessage = searchParams.get('message');
-    if (initialMessage) {
-      setMessages([
-        {
-          text: initialMessage,
-          sender: 'user',
-          timestamp: new Date().toISOString(),
-          status: 'completed'
-        },
-      ]);
-      
-      setIsLoading(true);
-      
-      // Simulate system response after 3 seconds
-      setTimeout(() => {
-        setIsLoading(false);
+  const processMessage = (messageText: string) => {
+    const userMessage: Message = {
+      text: messageText,
+      sender: 'user',
+      timestamp: new Date().toISOString(),
+      status: 'completed'
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+
+    // Check for demo commands
+    const demoResponse = DEMO_RESPONSES[messageText.toLowerCase().trim()];
+    
+    setTimeout(() => {
+      setIsLoading(false);
+      if (demoResponse) {
+        setMessages(prev => [...prev, {
+          ...demoResponse,
+          timestamp: new Date().toISOString()
+        }]);
+      } else {
         setMessages(prev => [...prev, {
           text: "I'll help you with your trade execution. Let me analyze your request.",
           sender: 'system',
@@ -222,7 +228,15 @@ export default function ChatPage() {
             }
           }
         }]);
-      }, 3000);
+      }
+    }, 1000);
+  };
+
+  useEffect(() => {
+    const initialMessage = searchParams.get('message');
+    if (initialMessage && !initialMessageProcessed.current) {
+      initialMessageProcessed.current = true;
+      processMessage(initialMessage);
     }
   }, [searchParams]);
 
@@ -230,36 +244,8 @@ export default function ChatPage() {
     e.preventDefault();
     if (!newMessage.trim()) return;
 
-    const userMessage: Message = {
-      text: newMessage,
-      sender: 'user',
-      timestamp: new Date().toISOString(),
-      status: 'completed'
-    };
-
-    setMessages(prev => [...prev, userMessage]);
+    processMessage(newMessage);
     setNewMessage('');
-    setIsLoading(true);
-
-    // Check for demo commands
-    const demoResponse = DEMO_RESPONSES[newMessage.toLowerCase().trim()];
-    
-    setTimeout(() => {
-      setIsLoading(false);
-      if (demoResponse) {
-        setMessages(prev => [...prev, {
-          ...demoResponse,
-          timestamp: new Date().toISOString()
-        }]);
-      } else {
-        setMessages(prev => [...prev, {
-          text: "I don't recognize that command. Try one of the demo commands shown above.",
-          sender: 'system',
-          timestamp: new Date().toISOString(),
-          status: 'completed'
-        }]);
-      }
-    }, 1000);
   };
 
   const handleConfirmAction = (messageIndex: number) => {
