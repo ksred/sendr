@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowRightLeft, MessageSquare } from 'lucide-react';
 import { tradingApi } from '@/lib/api/mock-trading-api';
 import { TradeIntent } from '@/types/trading';
@@ -9,6 +10,7 @@ export default function ExecutionPanel() {
   const [showInput, setShowInput] = useState(false);
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +45,8 @@ export default function ExecutionPanel() {
       };
 
       await tradingApi.submitTradeIntent(intent);
+      // Navigate to chat page with the input message
+      router.push(`/chat?message=${encodeURIComponent(input)}`);
       setInput('');
       setShowInput(false);
     } catch (error) {
