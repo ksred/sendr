@@ -1,29 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { ChevronRight, AlertCircle } from 'lucide-react';
-import { tradingApi } from '@/lib/api/mock-trading-api';
 import { Position } from '@/types/trading';
 import { formatCurrency } from '@/lib/utils/format';
+import { useAccount } from '@/contexts/account-context';
 
 export default function AccountOverview() {
-  const [positions, setPositions] = useState<Position[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const loadPositions = async () => {
-      try {
-        const data = await tradingApi.getPositions();
-        setPositions(data);
-      } catch (error) {
-        console.error('Failed to load positions:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadPositions();
-  }, []);
+  const { positions, isLoading, balance } = useAccount();
 
   return (
     <div className="bg-slate-900 text-white px-4 py-6 space-y-4">
@@ -32,7 +15,7 @@ export default function AccountOverview() {
         <div className="space-y-1">
           <p className="text-sm text-slate-400">Available for Trading</p>
           <p className="text-2xl font-bold tracking-tight">
-            {isLoading ? '...' : '$1,250,000.00'}
+            {isLoading ? '...' : formatCurrency(balance)}
           </p>
         </div>
         <button className="flex items-center gap-1 bg-slate-800 px-3 py-1.5 rounded-lg text-sm hover:bg-slate-700 transition-colors">
@@ -52,25 +35,32 @@ export default function AccountOverview() {
               />
             ))}
           </div>
-        ) : (
+        ) : positions.length > 0 ? (
           positions.map((position) => (
             <div
-              key={position.currency}
-              className="bg-slate-800 rounded-lg px-4 py-3 flex-shrink-0 min-w-[144px]"
+              key={position.id}
+              className="bg-slate-800 rounded-lg p-3 w-36 flex-shrink-0"
             >
-              <div className="flex justify-between items-start mb-1">
-                <p className="text-slate-400 text-sm">{position.currency} Position</p>
-                <ChevronRight size={16} className="text-slate-500" />
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm font-medium">{position.symbol}</p>
+                  <p className="text-xs text-slate-400">
+                    {formatCurrency(position.quantity, position.currency)}
+                  </p>
+                </div>
+                <ChevronRight size={16} className="text-slate-400" />
               </div>
-              <p className="font-medium">
-                {formatCurrency(position.amount, position.currency)}
-              </p>
-              <p className={`text-xs ${position.unrealizedPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {position.unrealizedPnL >= 0 ? '+' : ''}
-                {formatCurrency(position.unrealizedPnL, 'USD')}
+              <p
+                className={`text-sm mt-2 ${
+                  position.pnl >= 0 ? 'text-green-400' : 'text-red-400'
+                }`}
+              >
+                {formatCurrency(position.pnl)}
               </p>
             </div>
           ))
+        ) : (
+          <div className="text-slate-400 text-sm">No open positions</div>
         )}
       </div>
     </div>

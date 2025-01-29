@@ -43,10 +43,11 @@ export interface PositionContext {
 }
 
 export interface Position {
+  id: string;
+  symbol: string;
   currency: string;
-  amount: number;
-  valuationUSD: number;
-  unrealizedPnL: number;
+  quantity: number;
+  pnl: number;
 }
 
 export interface Trade {

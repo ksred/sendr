@@ -3,16 +3,18 @@ import { Trade, Position, TradeIntent } from '@/types/trading';
 // Mock data
 const mockPositions: Position[] = [
   {
+    id: 'p1',
+    symbol: 'EUR/USD',
     currency: 'EUR',
-    amount: 825000,
-    valuationUSD: 891000,
-    unrealizedPnL: 15000,
+    quantity: 825000,
+    pnl: 15000,
   },
   {
+    id: 'p2',
+    symbol: 'GBP/USD',
     currency: 'GBP',
-    amount: 420000,
-    valuationUSD: 532000,
-    unrealizedPnL: -3000,
+    quantity: 420000,
+    pnl: -3000,
   },
 ];
 
