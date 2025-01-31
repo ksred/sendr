@@ -31,12 +31,3 @@ export interface FeeStructure {
     processingFee: number;
   };
 }
-
-export interface FXResult {
-  success: boolean;
-  fromAmount: number;
-  toAmount: number;
-  exchangeRate: ExchangeRate;
-  fees: FeeStructure;
-  timestamp: Date;
-}

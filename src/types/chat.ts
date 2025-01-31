@@ -1,5 +1,4 @@
 import { PaymentOrder, PaymentIntent, PaymentEntities, ClarificationQuestions, ConfirmationMessage } from './payment';
-import { MarketConditions } from './trading';
 import { FeeStructure, ExchangeRate } from './exchange';
 
 export type ActionType =
@@ -28,7 +27,6 @@ export interface ActionData {
     entities?: PaymentEntities;
     clarification?: ClarificationQuestions;
     confirmation?: ConfirmationMessage;
-    marketConditions?: MarketConditions;
     exchangeRate?: ExchangeRate;
     fees?: FeeStructure;
     progress?: number;
@@ -48,7 +46,6 @@ export interface PaymentInitiationAction extends ActionData {
     intent?: PaymentIntent;
     entities?: PaymentEntities;
     clarification?: ClarificationQuestions;
-    marketConditions?: MarketConditions;
     fees?: FeeStructure;
   };
   options?: {

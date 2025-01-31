@@ -1,14 +1,11 @@
 'use client';
 
-import { Home, BarChart2, ArrowRightLeft, Wallet, Settings, MessageCircle } from 'lucide-react';
+import { Home, Settings, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const navItems = [
   { icon: Home, label: 'Home', href: '/' },
-  { icon: BarChart2, label: 'Markets', href: '/markets' },
-  { icon: ArrowRightLeft, label: 'Orders', href: '/orders' },
-  { icon: Wallet, label: 'Positions', href: '/positions' },
   { icon: Settings, label: 'Settings', href: '/settings' },
 ];
 

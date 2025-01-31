@@ -21,6 +21,7 @@ interface ChatMessage extends Message {
     };
   };
   isLoading?: boolean;
+  sender: 'user' | 'system';
 }
 
 const DEMO_COMMANDS = [
@@ -307,9 +308,9 @@ export default function ChatPage() {
     setMessages(prev => {
       const withoutLoading = prev.filter(msg => !msg.isLoading);
       const matchedCommand = findMatchingCommand(messageText);
-      const response = matchedCommand ? DEMO_RESPONSES[matchedCommand] : {
+      const response: ChatMessage = matchedCommand ? DEMO_RESPONSES[matchedCommand] : {
         text: "I'm not sure how to handle that request. Please try one of the example commands.",
-        sender: 'system',
+        sender: 'system' as const,
         timestamp: new Date().toISOString(),
         status: 'completed'
       };
@@ -499,9 +500,9 @@ export default function ChatPage() {
                   {message.action && (
                     <MessageAction
                       action={message.action}
-                      onConfirm={handleConfirmAction}
-                      onModify={handleModifyAction}
-                      onCancel={handleCancelAction}
+                      onConfirm={() => handleConfirmAction(message)}
+                      onModify={() => handleModifyAction(index)}
+                      onCancel={() => handleCancelAction(index)}
                     />
                   )}
                 </div>
