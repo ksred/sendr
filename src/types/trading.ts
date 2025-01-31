@@ -26,9 +26,11 @@ export interface TradeIntent {
 
 export interface MarketConditions {
   volatility: number;
-  trend: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  trend: MarketTrend;
   liquidity: number;
 }
+
+export type MarketTrend = 'BULLISH' | 'BEARISH' | 'NEUTRAL';
 
 export interface UserHistory {
   recentTrades: Trade[];
@@ -75,4 +77,48 @@ export interface TradeTranche {
   rate?: number;
   status: 'PENDING' | 'EXECUTED' | 'FAILED';
   executionTime?: Date;
+}
+
+/** @deprecated - Legacy forex interface */
+export interface TradeOrder {
+  baseCurrency: string;
+  quoteCurrency: string;
+  amount: number;
+}
+
+export interface PaymentOrder {
+  sourceCurrency: string;
+  targetCurrency: string;
+  amount: number;
+  beneficiary: {
+    name: string;
+    accountNumber: string;
+    bankCode: string;
+  };
+  paymentPurpose?: string;
+}
+
+export interface PaymentInitiationRequest {
+  sourceCurrency: string;
+  targetCurrency: string;
+  amount: number;
+  paymentPurpose: string;
+  beneficiaryDetails: {
+    name: string;
+    accountNumber: string;
+    bankCode: string;
+  };
+  frequency?: 'one-time' | 'recurring';
+}
+
+export interface PaymentConfirmation {
+  paymentId: string;
+  status: 'pending' | 'completed' | 'failed';
+  confirmationCode: string;
+  timestamp: string;
+  details: {
+    sourceAmount: number;
+    targetAmount: number;
+    fees: number;
+  };
 }

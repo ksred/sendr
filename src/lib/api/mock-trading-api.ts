@@ -1,4 +1,5 @@
 import { Trade, Position, TradeIntent } from '@/types/trading';
+import { v4 as uuidv4 } from 'uuid';
 
 // Mock data
 const mockPositions: Position[] = [
@@ -57,48 +58,54 @@ const mockTrades: Trade[] = [
 ];
 
 // Mock API endpoints
-export const tradingApi = {
-  getPositions: async (): Promise<Position[]> => {
+class MockTradingApi {
+  private validatePaymentRequest(request: any) {
+    if (!request.beneficiaryDetails.accountNumber) {
+      throw new Error('Invalid beneficiary account details');
+    }
+  }
+
+  private getExchangeRate(source: string, target: string): number {
+    return 1.2; // Mock rate
+  }
+
+  private calculatePaymentFees(request: any): number {
+    return request.amount * 0.02; // 2% fee
+  }
+
+  public getPositions = async (): Promise<Position[]> => {
     return new Promise((resolve) => {
       setTimeout(() => resolve(mockPositions), 500);
     });
-  },
+  };
 
-  getActiveTrades: async (): Promise<Trade[]> => {
+  public getActiveTrades = async (): Promise<Trade[]> => {
     return new Promise((resolve) => {
       setTimeout(() => resolve(mockTrades), 500);
     });
-  },
+  };
 
-  submitTradeIntent: async (intent: TradeIntent): Promise<Trade> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const newTrade: Trade = {
-          id: `t${Date.now()}`,
-          intent: {
-            description: 'New Trade',
-            analysis: {
-              goal: intent.goal,
-              amount: intent.constraints.amount,
-              deadline: intent.constraints.deadline,
-              constraints: [],
-            },
-          },
-          execution: {
-            strategy: 'TWAP',
-            tranches: [
-              {
-                id: `tr${Date.now()}`,
-                amount: intent.constraints.amount,
-                status: 'PENDING',
-              },
-            ],
-            status: 'PENDING',
-            progress: 0,
-          },
-        };
-        resolve(newTrade);
-      }, 1000);
-    });
-  },
-};
+  public initiatePayment = async (
+    request: any
+  ): Promise<any> => {
+    // Validate payment details
+    await this.validatePaymentRequest(request);
+
+    // Simulate payment processing delay
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    return {
+      paymentId: uuidv4(),
+      status: 'completed',
+      confirmationCode: `PAY-${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
+      timestamp: new Date().toISOString(),
+      details: {
+        sourceAmount: request.amount,
+        targetAmount: request.amount * this.getExchangeRate(request.sourceCurrency, request.targetCurrency),
+        fees: this.calculatePaymentFees(request),
+      },
+    };
+  };
+}
+
+export const tradingApi = new MockTradingApi();

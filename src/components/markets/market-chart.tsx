@@ -134,7 +134,7 @@ export default function MarketChart({ symbol, currency }: MarketChartProps) {
                   return (
                     <div className="bg-white border rounded-lg shadow p-2">
                       <p className="text-sm font-medium text-gray-900">
-                        {formatCurrency(payload[0].value, currency)}
+                        {formatCurrency((payload[0]?.value ?? 0) as number, currency)}
                       </p>
                       <p className="text-xs text-gray-500">
                         {payload[0].payload.timestamp}

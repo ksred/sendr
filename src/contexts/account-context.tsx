@@ -2,12 +2,15 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { tradingApi } from '@/lib/api/mock-trading-api';
-import { Position } from '@/types/trading';
+import { Position, PaymentOrder, PaymentConfirmation } from '@/types/trading';
 
 interface AccountContextType {
   positions: Position[];
   isLoading: boolean;
   balance: number;
+  currentPayment: PaymentOrder | null;
+  paymentHistory: PaymentConfirmation[];
+  exchangeRates: Record<string, number>;
 }
 
 const AccountContext = createContext<AccountContextType | undefined>(undefined);
@@ -15,6 +18,9 @@ const AccountContext = createContext<AccountContextType | undefined>(undefined);
 export function AccountProvider({ children }: { children: ReactNode }) {
   const [positions, setPositions] = useState<Position[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPayment, setCurrentPayment] = useState<PaymentOrder | null>(null);
+  const [paymentHistory, setPaymentHistory] = useState<PaymentConfirmation[]>([]);
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const loadPositions = async () => {
@@ -35,6 +41,9 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     positions,
     isLoading,
     balance: 1250000, // This would come from the API in a real app
+    currentPayment,
+    paymentHistory,
+    exchangeRates,
   };
 
   return (
