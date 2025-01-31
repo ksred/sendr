@@ -2,11 +2,13 @@ import { ApiClient } from './client';
 import { BeneficiariesApi } from './endpoints/beneficiaries';
 import { PaymentsApi } from './endpoints/payments';
 import { ExchangeApi } from './endpoints/exchange';
+import { PaymentIntentsApi } from './endpoints/payment-intents';
 
 export class Api {
   public beneficiaries: BeneficiariesApi;
   public payments: PaymentsApi;
   public exchange: ExchangeApi;
+  public paymentIntents: PaymentIntentsApi;
   
   private client: ApiClient;
 
@@ -17,6 +19,7 @@ export class Api {
     this.beneficiaries = new BeneficiariesApi(this.client);
     this.payments = new PaymentsApi(this.client);
     this.exchange = new ExchangeApi(this.client);
+    this.paymentIntents = new PaymentIntentsApi(this.client);
   }
 }
 
