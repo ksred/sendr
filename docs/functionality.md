@@ -8,137 +8,192 @@
 - User states:
   - Logged out
   - Logged in (active)
-  - Logged in (executing)
-  - Logged in (monitoring)
+  - Payment in progress
+  - Payment complete
 - User preferences persist in PostgreSQL
 - Real-time session syncing across devices
 
-### 2. LLM Integration System
+### 2. Payment Processing System
 ```typescript
-interface LLMProcessor {
-  // Intent Analysis
-  analyseIntent: (input: string) => Promise<TradeIntent>;
+interface PaymentProcessor {
+  // Payment Intent Analysis
+  analyseIntent: (input: string) => Promise<PaymentIntent>;
   
-  // Strategy Generation
-  generateStrategy: (intent: TradeIntent, context: MarketContext) => Promise<ExecutionStrategy>;
+  // Route Generation
+  generateRoute: (intent: PaymentIntent, context: PaymentContext) => Promise<PaymentRoute>;
   
-  // Risk Assessment
-  assessRisk: (strategy: ExecutionStrategy, marketData: MarketData) => Promise<RiskAssessment>;
+  // Fee Assessment
+  assessFees: (route: PaymentRoute, marketData: ExchangeData) => Promise<FeeAssessment>;
   
-  // Market Analysis
-  analyseMarket: (pair: string, depth: MarketDepth) => Promise<MarketAnalysis>;
+  // Exchange Rate Analysis
+  analyseExchangeRate: (fromCurrency: string, toCurrency: string) => Promise<ExchangeAnalysis>;
 }
 
-interface TradeIntent {
-  goal: 'SINGLE_EXECUTION' | 'SCHEDULED' | 'OPPORTUNISTIC';
-  constraints: {
+interface PaymentIntent {
+  type: 'DIRECT_PURCHASE' | 'PAYMENT_TO_PAYEE';
+  details: {
     amount: number;
-    deadline?: Date;
-    targetRate?: number;
-    riskTolerance: 'LOW' | 'MEDIUM' | 'HIGH';
+    sourceCurrency: string;
+    targetCurrency: string;
+    payeeDetails?: PayeeInformation;
+    purpose?: string;
   };
   context: {
-    marketConditions: MarketConditions;
+    marketRates: ExchangeRates;
     userHistory: UserHistory;
-    positionContext: PositionContext;
+    accountContext: AccountContext;
   };
 }
 ```
 
-### 3. Execution Engine
-- State Machine for Trade Process:
+### 2. LLM Payment Processing System
 ```typescript
-type ExecutionState =
+interface LLMProcessor {
+  // Natural Language Understanding
+  parsePaymentIntent: (input: string) => Promise<PaymentIntent>;
+  
+  // Entity Recognition
+  extractEntities: (input: string) => Promise<PaymentEntities>;
+  
+  // Clarification Generation
+  generateClarification: (missingInfo: string[], context: PaymentContext) => Promise<ClarificationQuestions>;
+  
+  // Payment Confirmation
+  generateConfirmation: (intent: PaymentIntent, rates: ExchangeRate) => Promise<ConfirmationMessage>;
+}
+
+interface PaymentEntities {
+  payee?: {
+    name: string;
+    matchedPayee?: PayeeInformation;
+  };
+  amount?: {
+    value: number;
+    currency: string;
+  };
+  purpose?: string;
+  timing?: 'immediate' | 'scheduled';
+  frequency?: 'one-time' | 'recurring';
+}
+
+interface ClarificationQuestions {
+  missingFields: string[];
+  questions: string[];
+  suggestions?: {
+    payees?: PayeeInformation[];
+    amounts?: number[];
+    currencies?: string[];
+  };
+}
+
+interface ConfirmationMessage {
+  summary: string;
+  details: {
+    payee: string;
+    sourceAmount: string;
+    targetAmount: string;
+    exchangeRate: string;
+    fees: string;
+    total: string;
+  };
+  warnings?: string[];
+  confirmationPrompt: string;
+}
+```
+
+### 3. Payment Engine
+- State Machine for Payment Process:
+```typescript
+type PaymentState =
   | 'INTENT_ANALYSIS'    // Processing user input
-  | 'STRATEGY_CREATION'  // Generating approach
-  | 'RISK_ASSESSMENT'    // Evaluating risk
-  | 'ORDER_SPLITTING'    // Creating tranches
-  | 'EXECUTION'          // Processing orders
-  | 'MONITORING'         // Tracking progress
+  | 'ROUTE_CREATION'     // Determining payment route
+  | 'FEE_ASSESSMENT'     // Calculating fees
+  | 'FUNDS_CHECK'        // Verifying available funds
+  | 'PROCESSING'         // Processing payment
   | 'COMPLETED'          // Finished
-  | 'CANCELLED'         // Terminated
+  | 'FAILED'            // Error occurred
 ```
 
-### 4. Market Data Management
+### 4. Exchange Rate Management
 ```typescript
-interface MarketDataManager {
-  subscribeToRates: (pairs: string[]) => void;
-  getMarketDepth: (pair: string) => Promise<MarketDepth>;
-  analyseMarketConditions: (pair: string) => Promise<MarketConditions>;
-  getLiquidityProfile: (pair: string) => Promise<LiquidityProfile>;
+interface ExchangeRateManager {
+  getCurrentRate: (fromCurrency: string, toCurrency: string) => Promise<ExchangeRate>;
+  getHistoricalRates: (fromCurrency: string, toCurrency: string, period: string) => Promise<ExchangeRateHistory>;
+  subscribeToCurrencyPair: (fromCurrency: string, toCurrency: string) => void;
+  getFees: (amount: number, fromCurrency: string, toCurrency: string) => Promise<FeeStructure>;
 }
 
-interface MarketDepth {
-  pair: string;
-  bids: PriceLevel[];
-  asks: PriceLevel[];
+interface ExchangeRate {
+  fromCurrency: string;
+  toCurrency: string;
+  rate: number;
   timestamp: Date;
-  liquidityScore: number;
+  spread: number;
 }
 ```
 
-### 5. Position & Risk Management
+### 5. Account & Balance Management
 ```typescript
-interface PositionManager {
-  getCurrentPositions: () => Promise<Positions>;
-  calculateExposure: (positions: Positions) => Exposure;
-  monitorRiskLimits: (positions: Positions) => RiskMetrics;
-  trackPositionChanges: (positions: Positions) => PositionUpdates;
+interface AccountManager {
+  getBalances: () => Promise<CurrencyBalances>;
+  checkSufficientFunds: (amount: number, currency: string) => Promise<boolean>;
+  reserveFunds: (amount: number, currency: string) => Promise<ReservationResult>;
+  processForeignExchange: (amount: number, fromCurrency: string, toCurrency: string) => Promise<FXResult>;
 }
 
-interface Position {
+interface CurrencyBalance {
   currency: string;
-  amount: number;
-  valuationUSD: number;
-  unrealizedPnL: number;
-  exposure: Exposure;
+  availableBalance: number;
+  reservedBalance: number;
+  pendingTransactions: Transaction[];
 }
 ```
 
 ## API Endpoints
 
-### 1. Trade Management
+### 1. Payment Management
 ```typescript
-// Trade Endpoints
-POST   /api/v1/trades/analyse      // Analyse trade intent
-POST   /api/v1/trades/execute      // Execute trade strategy
-GET    /api/v1/trades/:id          // Get trade details
-GET    /api/v1/trades/active       // List active trades
-PATCH  /api/v1/trades/:id          // Modify trade
-DELETE /api/v1/trades/:id          // Cancel trade
+// Payment Endpoints
+POST   /api/v1/payments/analyse      // Analyse payment intent
+POST   /api/v1/payments/process      // Process payment
+GET    /api/v1/payments/:id          // Get payment details
+GET    /api/v1/payments/active       // List active payments
+PATCH  /api/v1/payments/:id          // Modify payment
+DELETE /api/v1/payments/:id          // Cancel payment
 
-// Position Endpoints
-GET    /api/v1/positions           // Get current positions
-GET    /api/v1/positions/history   // Get position history
-GET    /api/v1/positions/exposure  // Get exposure analysis
+// Account Endpoints
+GET    /api/v1/accounts/balances     // Get current balances
+GET    /api/v1/accounts/transactions // Get transaction history
+GET    /api/v1/accounts/exchange     // Get exchange rates
 
-// Market Data Endpoints
-GET    /api/v1/market/rates        // Get current rates
-GET    /api/v1/market/depth        // Get market depth
-GET    /api/v1/market/analysis     // Get market analysis
+// Exchange Rate Endpoints
+GET    /api/v1/exchange/rates        // Get current exchange rates
+GET    /api/v1/exchange/history      // Get historical exchange rates
+GET    /api/v1/exchange/fees         // Get fees for exchange
 ```
 
 ### 2. WebSocket Events
 ```typescript
 interface WebSocketEvents {
-  // Market Updates
-  RATE_UPDATE: {
-    pair: string;
-    rate: number;
-    timestamp: Date;
-  };
-  
-  // Execution Updates
-  TRADE_UPDATE: {
-    tradeId: string;
-    status: ExecutionState;
+  // Payment Updates
+  PAYMENT_UPDATE: {
+    paymentId: string;
+    status: PaymentState;
     progress: number;
   };
   
-  // Position Updates
-  POSITION_UPDATE: {
-    currency: string;
-    amount: number;
+  // Account Updates
+  ACCOUNT_UPDATE: {
+    accountId: string;
+    balance: number;
+    timestamp: Date;
+  };
+  
+  // Exchange Rate Updates
+  EXCHANGE_RATE_UPDATE: {
+    fromCurrency: string;
+    toCurrency: string;
+    rate: number;
     timestamp: Date;
   };
 }
@@ -152,21 +207,21 @@ interface ClientState {
   user: {
     profile: UserProfile;
     preferences: UserPreferences;
-    limits: TradingLimits;
+    limits: PaymentLimits;
   };
-  trades: {
-    active: Trade[];
-    history: TradeHistory;
-    templates: TradeTemplate[];
+  payments: {
+    active: Payment[];
+    history: PaymentHistory;
+    templates: PaymentTemplate[];
   };
-  market: {
-    rates: RateCache;
-    analysis: MarketAnalysis;
+  exchange: {
+    rates: ExchangeRateCache;
+    analysis: ExchangeAnalysis;
     alerts: Alert[];
   };
   ui: {
     theme: 'light' | 'dark';
-    executionPanel: ExecutionPanelState;
+    paymentPanel: PaymentPanelState;
     notifications: NotificationState;
   };
 }
@@ -177,17 +232,17 @@ interface ClientState {
 interface ServerState {
   sessions: {
     active: Session[];
-    trades: ActiveTrade[];
-    subscriptions: MarketSubscription[];
+    payments: ActivePayment[];
+    subscriptions: ExchangeSubscription[];
   };
   cache: {
-    rates: RateCache;
-    depth: DepthCache;
+    exchangeRates: ExchangeRateCache;
+    paymentRoutes: PaymentRouteCache;
     analysis: AnalysisCache;
   };
   monitoring: {
     systemHealth: HealthMetrics;
-    executionMetrics: ExecutionMetrics;
+    paymentMetrics: PaymentMetrics;
     errorRates: ErrorMetrics;
   };
 }
@@ -196,9 +251,8 @@ interface ServerState {
 ## Error Handling
 ```typescript
 interface ErrorHandler {
-  handleExecutionError: (error: ExecutionError) => ErrorResponse;
-  handleMarketDataError: (error: MarketDataError) => ErrorResponse;
-  handleLLMError: (error: LLMError) => ErrorResponse;
+  handlePaymentError: (error: PaymentError) => ErrorResponse;
+  handleExchangeError: (error: ExchangeError) => ErrorResponse;
   handleWebSocketError: (error: WebSocketError) => ErrorResponse;
 }
 
@@ -214,18 +268,18 @@ interface ErrorResponse {
 ## Performance Considerations
 
 ### 1. Optimization Strategies
-- Rate caching with WebSocket updates
-- Efficient market depth processing
-- LLM response caching for similar intents
-- Position calculation optimization
-- Execution engine performance tuning
+- Exchange rate caching with WebSocket updates
+- Efficient payment route processing
+- Payment intent analysis caching
+- Account balance calculation optimization
+- Payment engine performance tuning
 
 ### 2. Monitoring Metrics
-- Response times for intent analysis
-- Execution completion rates
-- Market data latency
+- Response times for payment intent analysis
+- Payment completion rates
+- Exchange rate latency
 - WebSocket message rates
 - Error frequencies
 - System resource utilization
 
-This specification focuses on creating a sophisticated forex trading platform with natural language understanding capabilities while maintaining high performance and reliability.
+This specification focuses on creating a sophisticated payment platform with real-time exchange rate updates and efficient payment processing while maintaining high performance and reliability.
