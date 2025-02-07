@@ -19,19 +19,26 @@ export interface PaymentOrder {
 }
 
 export interface PaymentIntent {
-  type: PaymentIntentType;
-  details: {
+  amount: string;
+  bank_info: string;
+  beneficiary: {
+    bank_info: string;
+    id: number;
+    match: number;
+    name: string;
+  };
+  beneficiary_name: string;
+  confidence: {
     amount: number;
-    sourceCurrency: string;
-    targetCurrency: string;
-    payeeDetails?: PayeeInformation;
-    purpose?: string;
+    currency: number;
+    beneficiary: number;
   };
-  context: {
-    marketRates: ExchangeRates;
-    userHistory: UserHistory;
-    accountContext: AccountContext;
-  };
+  currency: string;
+  from_currency: string;
+  to_currency: string;
+  purpose: string;
+  suggestions: string[];
+  total_cost: string;
 }
 
 export interface PayeeInformation {

@@ -9,6 +9,8 @@ import LoadingDots from '@/components/ui/loading-dots';
 import { Send, Info, ArrowLeft } from 'lucide-react';
 import { PaymentOrder, PaymentConfirmation, PaymentIntent } from '@/types/payment';
 import { Message, MessageAction as MessageActionType, ActionType, ActionData } from '@/types/chat';
+import api from '@/lib/api';
+import { ApiClientError } from '@/lib/api/client';
 
 interface ChatMessage extends Message {
   paymentDetails?: {
@@ -251,7 +253,7 @@ const DEMO_RESPONSES: Record<string, ChatMessage> = {
 
 const findMatchingCommand = (input: string): string | null => {
   const normalizedInput = input.toLowerCase().replace(/[€$]/g, '');
-  
+
   if (DEMO_RESPONSES[input]) {
     return input;
   }
@@ -284,40 +286,87 @@ export default function ChatPage() {
   }, [messages, isProcessing]);
 
   const processMessage = async (messageText: string) => {
-    const userMessage: ChatMessage = {
-      text: messageText,
-      sender: 'user',
-      timestamp: new Date().toISOString(),
-      status: 'completed'
-    };
+    try {
+      setMessages(prev => [
+        ...prev,
+        {
+          text: messageText,
+          sender: 'user',
+          timestamp: new Date().toISOString(),
+          status: 'completed'
+        },
+        {
+          text: '',
+          sender: 'system',
+          timestamp: new Date().toISOString(),
+          status: 'loading',
+          isLoading: true
+        }
+      ]);
 
-    setMessages(prev => [...prev, userMessage]);
-    setIsProcessing(true);
+      const processedIntent = await api.paymentIntents.process(messageText);
+      console.log('Chat processMessage - Received response:', processedIntent);
 
-    const loadingMessage: ChatMessage = {
-      text: '',
-      sender: 'system',
-      timestamp: new Date().toISOString(),
-      status: 'pending',
-      isLoading: true
-    };
-    setMessages(prev => [...prev, loadingMessage]);
+      if (processedIntent.error) {
+        setMessages(prev => {
+          const withoutLoading = prev.filter(msg => !msg.isLoading);
+          return [...withoutLoading, {
+            text: `Sorry, I couldn't process your payment request: ${processedIntent.error}`,
+            sender: 'system',
+            timestamp: new Date().toISOString(),
+            status: 'error'
+          }];
+        });
+        return;
+      }
 
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    setMessages(prev => {
-      const withoutLoading = prev.filter(msg => !msg.isLoading);
-      const matchedCommand = findMatchingCommand(messageText);
-      const response: ChatMessage = matchedCommand ? DEMO_RESPONSES[matchedCommand] : {
-        text: "I'm not sure how to handle that request. Please try one of the example commands.",
-        sender: 'system' as const,
-        timestamp: new Date().toISOString(),
-        status: 'completed'
-      };
-      return [...withoutLoading, response];
-    });
-    
-    setIsProcessing(false);
+      setMessages(prev => {
+        const withoutLoading = prev.filter(msg => !msg.isLoading);
+        console.log('Chat processMessage - Creating response message with intent:', processedIntent);
+        const response: ChatMessage = {
+          text: "Here's what I found based on your payment request:",
+          sender: 'system',
+          timestamp: new Date().toISOString(),
+          status: 'completed',
+          action: {
+            type: 'PAYMENT_INITIATION',
+            data: {
+              intent: {
+                details: {
+                  amount: processedIntent.amount,
+                  from_currency: processedIntent.from_currency,
+                  to_currency: processedIntent.to_currency,
+                  converted_amount: processedIntent.converted_amount,
+                  exchange_rate: processedIntent.exchange_rate,
+                  fees: processedIntent.fees,
+                  total_cost: processedIntent.total_cost,
+                  payeeDetails: {
+                    name: processedIntent.beneficiary?.name || '',
+                    bankInfo: processedIntent.beneficiary?.bank_info || '',
+                    matchConfidence: processedIntent.beneficiary?.match || 0
+                  }
+                },
+                confidence: processedIntent.confidence,
+              }
+            }
+          }
+        };
+        console.log('Chat processMessage - Created response message:', response);
+        return [...withoutLoading, response];
+      });
+    } catch (error: any) {
+      console.error('Chat processMessage - Error:', error);
+      setMessages(prev => {
+        const withoutLoading = prev.filter(msg => !msg.isLoading);
+        const errorMessage = error.response?.data?.error || error.message || 'An unknown error occurred';
+        return [...withoutLoading, {
+          text: `Sorry, I couldn't process your payment request: ${errorMessage}`,
+          sender: 'system',
+          timestamp: new Date().toISOString(),
+          status: 'error'
+        }];
+      });
+    }
   };
 
   useEffect(() => {
@@ -336,106 +385,19 @@ export default function ChatPage() {
     setNewMessage('');
   };
 
-  const handleConfirmAction = (message: ChatMessage) => {
-    if (!message.action) return;
-
-    setMessages(prev => {
-      const messageIndex = prev.indexOf(message);
-      if (messageIndex === -1) return prev;
-
-      const updated = [...prev];
-      updated[messageIndex] = { ...message, status: 'completed' };
-
-      const paymentOrder: PaymentOrder = {
-        sourceCurrency: message.paymentDetails?.sourceCurrency || 'USD',
-        targetCurrency: message.paymentDetails?.targetCurrency || 'EUR',
-        amount: message.amount || 0,
-        beneficiary: {
-          name: message.paymentDetails?.beneficiary?.name || '',
-          accountNumber: message.paymentDetails?.beneficiary?.accountNumber || '',
-          bankCode: message.paymentDetails?.beneficiary?.bankCode || ''
-        }
-      };
-
-      const paymentIntent: PaymentIntent = {
-        type: 'PAYMENT_TO_PAYEE',
-        details: {
-          amount: paymentOrder.amount,
-          sourceCurrency: paymentOrder.sourceCurrency,
-          targetCurrency: paymentOrder.targetCurrency,
-          payeeDetails: {
-            name: paymentOrder.beneficiary.name,
-            accountNumber: paymentOrder.beneficiary.accountNumber,
-            bankCode: paymentOrder.beneficiary.bankCode
-          },
-          purpose: message.purpose
-        },
-        context: {
-          marketRates: {
-            USDEUR: {
-              fromCurrency: 'USD',
-              toCurrency: 'EUR',
-              rate: 0.92,
-              timestamp: new Date(),
-              spread: 0.001
-            },
-            EURUSD: {
-              fromCurrency: 'EUR',
-              toCurrency: 'USD',
-              rate: 1.09,
-              timestamp: new Date(),
-              spread: 0.001
-            }
-          },
-          userHistory: {
-            recentTransactions: [],
-            preferredCurrencies: [paymentOrder.sourceCurrency, paymentOrder.targetCurrency],
-            riskProfile: 'MEDIUM',
-            paymentFrequency: 0,
-            averagePaymentSize: 0
-          },
-          accountContext: {
-            balances: {},
-            limits: {
-              daily: 1000000,
-              monthly: 5000000,
-              perTransaction: 1000000
-            },
-            utilizationRate: 0,
-            status: 'ACTIVE'
-          }
-        }
-      };
-
-      const actionData: MessageActionType = {
-        type: 'PAYMENT_CONFIRMATION',
-        data: {
-          intent: paymentIntent,
-          progress: 100
-        },
-        options: {
-          cancel: true
-        }
-      };
-
-      const newMessage: ChatMessage = {
-        text: "Payment confirmed successfully.",
-        sender: 'system',
-        timestamp: new Date().toISOString(),
-        status: 'completed',
-        action: actionData
-      };
-
-      return [...updated, newMessage];
-    });
+  const handleConfirm = () => {
+    console.log('Payment confirmed');
+    // TODO: Implement payment confirmation
   };
 
-  const handleModifyAction = (messageIndex: number) => {
-    console.log('Modify action for message:', messageIndex);
+  const handleModify = () => {
+    console.log('Payment modification requested');
+    // TODO: Implement payment modification
   };
 
-  const handleCancelAction = (messageIndex: number) => {
-    console.log('Cancel action for message:', messageIndex);
+  const handleCancel = () => {
+    console.log('Payment cancelled');
+    // TODO: Implement payment cancellation
   };
 
   return (
@@ -480,18 +442,16 @@ export default function ChatPage() {
             {messages.map((message, index) => (
               <div
                 key={index}
-                className={`flex ${
-                  message.sender === 'user' ? 'justify-end' : 'justify-start'
-                }`}
+                className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'
+                  }`}
               >
                 <div
-                  className={`${
-                    message.isLoading 
-                      ? 'bg-transparent p-2' 
-                      : message.sender === 'user'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 text-gray-900'
-                  } ${!message.isLoading && 'p-4'} rounded-lg max-w-[80%]`}
+                  className={`${message.isLoading
+                    ? 'bg-transparent p-2'
+                    : message.sender === 'user'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 text-gray-900'
+                    } ${!message.isLoading && 'p-4'} rounded-lg max-w-[80%]`}
                 >
                   <div className={`break-words ${message.isLoading ? 'text-gray-500' : ''}`}>
                     {message.text}
@@ -500,9 +460,9 @@ export default function ChatPage() {
                   {message.action && (
                     <MessageAction
                       action={message.action}
-                      onConfirm={() => handleConfirmAction(message)}
-                      onModify={() => handleModifyAction(index)}
-                      onCancel={() => handleCancelAction(index)}
+                      onConfirm={handleConfirm}
+                      onModify={handleModify}
+                      onCancel={handleCancel}
                     />
                   )}
                 </div>

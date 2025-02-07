@@ -1,51 +1,56 @@
 import { Payment, PaymentMethod, PaymentPriority } from './payment';
 import { Beneficiary } from './beneficiary';
 
+export interface ProcessedBeneficiary {
+  id?: number;
+  name: string;
+  bank_info?: string;
+  match?: number;
+}
+
+export interface PaymentConfidence {
+  amount: number;
+  currency: number;
+  beneficiary: number;
+}
+
+export interface PaymentSuggestion {
+  amount: string;
+  currency: string;
+  beneficiaryInfo: {
+    name: string;
+    bankInfo: string;
+    matchedId: number | null;
+  };
+  reason: string;
+}
+
+export interface ProcessedPaymentIntent {
+  amount: string;
+  bank_info: string;
+  beneficiary: ProcessedBeneficiary;
+  beneficiary_name: string;
+  confidence: PaymentConfidence;
+  converted_amount: string;
+  currency: string;
+  exchange_rate: string;
+  fees: string;
+  from_currency: string;
+  purpose: string;
+  suggestions: PaymentSuggestion[];
+  to_currency: string;
+  total_cost: string;
+}
+
+export interface PaymentIntentError {
+  error: string;
+}
+
 export interface PaymentIntent {
   id: string;
   rawInput: string;  // Original user input
   status: 'pending_confirmation' | 'confirmed' | 'rejected' | 'expired';
-  parsed: {
-    beneficiary: {
-      id?: string;  // If matched to existing beneficiary
-      name: string;
-      matchConfidence?: number;
-      possibleMatches?: Array<{
-        id: string;
-        name: string;
-        confidence: number;
-      }>;
-    };
-    amount: {
-      value: number;
-      currency: string;
-      isApproximate: boolean;
-    };
-    timing?: {
-      scheduledDate?: string;
-      priority?: PaymentPriority;
-      recurring?: {
-        frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
-        endDate?: string;
-      };
-    };
-    purpose?: string;
-    notes?: string;
-  };
-  suggestion: {
-    payment: Omit<Payment, 'id' | 'status' | 'createdAt' | 'updatedAt'>;
-    alternativeOptions?: Array<{
-      field: string;
-      currentValue: any;
-      suggestedValue: any;
-      reason: string;
-    }>;
-    warnings?: Array<{
-      type: string;
-      message: string;
-      severity: 'low' | 'medium' | 'high';
-    }>;
-  };
+  processed: ProcessedPaymentIntent;
   requiresConfirmation: boolean;
   confirmationDetails?: Array<{
     field: string;

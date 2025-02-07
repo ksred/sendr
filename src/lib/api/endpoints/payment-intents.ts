@@ -1,13 +1,15 @@
 import { ApiClient } from '../client';
+import { auth } from '@/lib/auth';
 import {
   PaymentIntent,
   CreatePaymentIntentRequest,
   ConfirmPaymentIntentRequest,
-  PaymentIntentValidation
+  PaymentIntentValidation,
+  ProcessedPaymentIntent
 } from '@/types/api/payment-intent';
 
 export class PaymentIntentsApi {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async create(data: CreatePaymentIntentRequest): Promise<PaymentIntent> {
     return this.client.post('/payment-intents', data);
@@ -39,5 +41,31 @@ export class PaymentIntentsApi {
     }>;
   }> {
     return this.client.get(`/payment-intents/${id}/suggestions`);
+  }
+
+  async process(text: string): Promise<ProcessedPaymentIntent> {
+    const token = auth.getToken();
+    console.log('PaymentIntentsApi.process - Starting request with text:', text);
+    console.log('PaymentIntentsApi.process - Using auth token:', token ? 'Present' : 'Missing');
+
+    try {
+      const response = await this.client.post('/api/v1/payment-intents/process',
+        { text },
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+      );
+      console.log('PaymentIntentsApi.process - Response:', response);
+      
+      if (response.status >= 400) {
+        throw new Error(response.data.error || 'Failed to process payment intent');
+      }
+      
+      return response;
+    } catch (error: any) {
+      console.error('PaymentIntentsApi.process - Error:', error);
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      }
+      throw error;
+    }
   }
 }

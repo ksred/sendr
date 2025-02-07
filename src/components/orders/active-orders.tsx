@@ -1,33 +1,34 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronRight } from 'lucide-react';
-import { tradingApi } from '@/lib/api/mock-trading-api';
-import { Trade } from '@/types/trading';
+import { Payment } from '@/types/api/payment';
+import api from '@/lib/api';
 
-export default function ActiveOrders() {
-  const [trades, setTrades] = useState<Trade[]>([]);
+export default function ActivePayments() {
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadTrades = async () => {
+    const loadPayments = async () => {
       try {
-        const data = await tradingApi.getActiveTrades();
-        setTrades(data);
+        const response = await api.payments.list({
+          status: 'active'
+        });
+        setPayments(response.data);
       } catch (error) {
-        console.error('Failed to load trades:', error);
+        console.error('Failed to load payments:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadTrades();
+    loadPayments();
   }, []);
 
   if (isLoading) {
     return (
       <div className="space-y-3">
-        <h2 className="font-semibold">Active Orders</h2>
+        <h2 className="font-semibold">Active Payments</h2>
         <div className="animate-pulse space-y-4">
           {[1, 2].map((i) => (
             <div key={i} className="card h-32" />
@@ -38,61 +39,40 @@ export default function ActiveOrders() {
   }
 
   return (
-    <div className="space-y-3">
-      <h2 className="font-semibold">Active Orders</h2>
-      {trades.length === 0 ? (
-        <div className="card text-center py-8 text-slate-500">
-          <p>No active orders</p>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-semibold">Active Payments</h2>
+      </div>
+
+      {payments.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          <p>No active payments</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {trades.map((trade) => (
-            <div key={trade.id} className="card space-y-4">
-              {/* Order Header */}
-              <div className="flex items-center justify-between pb-4 border-b">
+        <div className="space-y-4">
+          {payments.map((payment) => (
+            <div key={payment.id} className="card space-y-4">
+              <div className="flex justify-between items-start">
                 <div>
-                  <p className="font-medium">{trade.intent.description}</p>
-                  <p className="text-sm text-slate-500">
-                    {trade.execution.tranches.length} tranches • {
-                      trade.execution.tranches.filter(t => t.status === 'PENDING').length
-                    } remaining
+                  <p className="font-medium">{payment.description}</p>
+                  <p className="text-sm text-gray-500">
+                    Amount: {payment.amount} {payment.currency}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-amber-500 text-sm font-medium">
-                    {trade.execution.status.replace('_', ' ')}
-                  </span>
-                  <ChevronRight size={16} className="text-slate-400" />
+                <div className="px-3 py-1 rounded-full text-sm" 
+                  style={{ 
+                    backgroundColor: payment.status === 'COMPLETED' ? '#dcfce7' : '#fee2e2',
+                    color: payment.status === 'COMPLETED' ? '#166534' : '#991b1b'
+                  }}>
+                  {payment.status}
                 </div>
               </div>
-
-              {/* Progress Bar */}
-              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                  style={{ width: `${trade.execution.progress}%` }}
-                />
-              </div>
-
-              {/* Tranches */}
-              <div className="space-y-3">
-                {trade.execution.tranches.map((tranche, index) => (
-                  <div 
-                    key={tranche.id}
-                    className="flex justify-between items-center text-sm"
-                  >
-                    <span className="text-slate-600">
-                      Tranche {index + 1}/{trade.execution.tranches.length}
-                    </span>
-                    <span>
-                      {new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: 'USD'
-                      }).format(tranche.amount)}
-                      {tranche.rate ? ` @ ${tranche.rate}` : ''}
-                    </span>
-                  </div>
-                ))}
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-gray-500">
+                  <span>Beneficiary: {payment.beneficiary.name}</span>
+                  <span>{new Date(payment.createdAt).toLocaleDateString()}</span>
+                </div>
               </div>
             </div>
           ))}

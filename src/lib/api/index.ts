@@ -9,12 +9,12 @@ export class Api {
   public payments: PaymentsApi;
   public exchange: ExchangeApi;
   public paymentIntents: PaymentIntentsApi;
-  
+
   private client: ApiClient;
 
   constructor(baseUrl: string, apiKey?: string) {
     this.client = new ApiClient(baseUrl, apiKey);
-    
+
     // Initialize all API endpoints
     this.beneficiaries = new BeneficiariesApi(this.client);
     this.payments = new PaymentsApi(this.client);
@@ -24,9 +24,7 @@ export class Api {
 }
 
 // Create and export a default instance
-const api = new Api(
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api',
+export default new Api(
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api',
   process.env.NEXT_PUBLIC_API_KEY
 );
-
-export default api;
