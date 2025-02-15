@@ -4,6 +4,7 @@ import { Check, X, Edit2, Loader2, AlertCircle } from 'lucide-react';
 import { ActionData } from '@/types/chat';
 import { useState } from 'react';
 import api, { ApiClientError } from '@/lib/api';
+import { usePaymentStatus } from '@/hooks/usePaymentStatus';
 
 interface MessageActionProps {
   action: ActionData;
@@ -15,9 +16,13 @@ interface MessageActionProps {
 type Status = 'idle' | 'loading' | 'success' | 'error';
 
 export default function MessageAction({ action, onConfirm, onModify, onCancel }: MessageActionProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [status, setStatus] = useState<Status>('idle');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const {
+    status,
+    errorMessage,
+    handleConfirm: confirmPayment,
+    handleReject: rejectPayment,
+    getStatusStyles
+  } = usePaymentStatus(onConfirm);
 
   const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat('en-US', {
@@ -29,41 +34,13 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel }:
   };
 
   const handleConfirm = async () => {
-    console.log('handleConfirm', action.data.intent);
     if (!action.data.intent?.payment_id) return;
-
-    setStatus('loading');
-    setErrorMessage(null);
-    try {
-      await api.paymentIntents.confirm(action.data.intent.payment_id);
-      setStatus('success');
-      onConfirm?.();
-    } catch (error: any) {
-      console.error('Failed to confirm payment intent:', error);
-      setStatus('error');
-      setErrorMessage(error.message || 'Failed to confirm payment. Please try again.');
-    }
+    await confirmPayment(action.data.intent.payment_id);
   };
 
   const handleReject = async () => {
-    console.log('handleCancel', action.data.intent);
     if (!action.data.intent?.payment_id) return;
-
-    setStatus('loading');
-    setErrorMessage(null);
-    try {
-      const response = await api.paymentIntents.reject(action.data.intent.payment_id);
-      if (action.data.intent) {
-        action.data.intent.status = response.status;
-      }
-      console.log("Rejected payment intent:", action.data.intent)
-      setStatus('success');
-      onCancel?.();
-    } catch (error: any) {
-      console.error('Failed to cancel payment intent:', error);
-      setStatus('error');
-      setErrorMessage(error.message || 'Failed to cancel payment. Please try again.');
-    }
+    await rejectPayment(action.data.intent.payment_id, onCancel);
   };
 
   const renderIntentAnalysis = () => {
@@ -79,19 +56,6 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel }:
       fees,
       total_cost
     } = intent.details;
-
-    const getStatusStyles = () => {
-      switch (status) {
-        case 'loading':
-          return 'opacity-50';
-        case 'success':
-          return 'border border-green-400/30';
-        case 'error':
-          return 'border border-red-400/30';
-        default:
-          return '';
-      }
-    };
 
     return (
       <div className="mt-4 space-y-4">
