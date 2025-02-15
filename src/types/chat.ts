@@ -17,7 +17,15 @@ export type ActionType =
   | 'CLARIFICATION'       // Request missing information
   | 'BENEFICIARY_VALIDATION' // Validate beneficiary details
   | 'RISK_ASSESSMENT'     // Assess payment risk
-  | 'CANCELLATION';       // Cancel payment
+  | 'CANCELLATION'        // Cancel payment
+  // Transaction History
+  | 'TRANSACTION_LIST'    // List transactions
+  | 'TRANSACTION_DETAIL'  // Show transaction details
+  // Beneficiary Management
+  | 'BENEFICIARY_LIST'    // List beneficiaries
+  | 'BENEFICIARY_ADD'     // Add new beneficiary
+  | 'BENEFICIARY_EDIT'    // Edit beneficiary
+  | 'BENEFICIARY_DELETE'; // Delete beneficiary
 
 // Base action data interface
 export interface ActionData {
@@ -31,12 +39,42 @@ export interface ActionData {
     fees?: FeeStructure;
     progress?: number;
     error?: string;
+    transactions?: Transaction[];
+    transaction?: Transaction;
+    beneficiaries?: Beneficiary[];
+    beneficiary?: Beneficiary;
   };
   options?: {
     confirm?: boolean;
     modify?: boolean;
     cancel?: boolean;
+    add?: boolean;
+    edit?: boolean;
+    delete?: boolean;
   };
+}
+
+export interface Transaction {
+  id: string;
+  date: string;
+  type: 'send' | 'receive';
+  amount: number;
+  currency: string;
+  status: 'completed' | 'pending' | 'failed';
+  beneficiary: Beneficiary;
+  description?: string;
+}
+
+export interface Beneficiary {
+  id: string;
+  name: string;
+  accountNumber: string;
+  bankCode: string;
+  bankName?: string;
+  country?: string;
+  currency?: string;
+  email?: string;
+  lastUsed?: string;
 }
 
 // Payment initiation specific action

@@ -7,8 +7,8 @@ export type Status = 'idle' | 'loading' | 'success' | 'error';
 interface UsePaymentStatusReturn {
   status: Status;
   errorMessage: string | null;
-  handleConfirm: (paymentId: string) => Promise<void>;
-  handleReject: (paymentId: string, onSuccess?: () => void) => Promise<void>;
+  handleConfirm: (intent: PaymentIntent) => Promise<void>;
+  handleReject: (intent: PaymentIntent, onSuccess?: () => void) => Promise<void>;
   getStatusStyles: () => string;
 }
 
@@ -16,11 +16,14 @@ export function usePaymentStatus(onConfirmSuccess?: () => void): UsePaymentStatu
   const [status, setStatus] = useState<Status>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleConfirm = async (paymentId: string) => {
+  const handleConfirm = async (intent: PaymentIntent) => {
+    if (!intent?.payment_id) return;
+    
     setStatus('loading');
     setErrorMessage(null);
     try {
-      await api.paymentIntents.confirm(paymentId);
+      const response = await api.paymentIntents.confirm(intent.payment_id);
+      intent.status = response.status; // Update the intent status
       setStatus('success');
       onConfirmSuccess?.();
     } catch (error: any) {
@@ -30,11 +33,14 @@ export function usePaymentStatus(onConfirmSuccess?: () => void): UsePaymentStatu
     }
   };
 
-  const handleReject = async (paymentId: string, onSuccess?: () => void) => {
+  const handleReject = async (intent: PaymentIntent, onSuccess?: () => void) => {
+    if (!intent?.payment_id) return;
+
     setStatus('loading');
     setErrorMessage(null);
     try {
-      const response = await api.paymentIntents.reject(paymentId);
+      const response = await api.paymentIntents.reject(intent.payment_id);
+      intent.status = response.status; // Update the intent status
       setStatus('success');
       onSuccess?.();
     } catch (error: any) {
