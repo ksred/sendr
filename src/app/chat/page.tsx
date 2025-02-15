@@ -335,6 +335,7 @@ export default function ChatPage() {
                 payment_id: processedIntent.paymentId,
                 details: {
                   amount: processedIntent.amount,
+                  status: processedIntent.status,
                   from_currency: String(processedIntent.fromCurrency),
                   to_currency: String(processedIntent.toCurrency),
                   converted_amount: processedIntent.convertedAmount,

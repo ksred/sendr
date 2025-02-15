@@ -21,6 +21,7 @@ export interface PaymentOrder {
 export interface PaymentIntent {
   payment_id: string;
   amount: string;
+  status: string;
   bank_info: string;
   beneficiary: {
     bank_info: string;

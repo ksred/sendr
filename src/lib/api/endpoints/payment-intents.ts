@@ -49,7 +49,7 @@ export class PaymentIntentsApi {
       throw new Error('Authentication token missing');
     }
     try {
-      const response = await this.client.post(`/api/v1/payment-intents/1${id}/confirm`, {}, {
+      const response = await this.client.post(`/api/v1/payment-intents/${id}/confirm`, {}, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined
       });
       if (response.status >= 400) {
@@ -65,13 +65,13 @@ export class PaymentIntentsApi {
     }
   }
 
-  async cancel(id: string): Promise<PaymentIntent> {
+  async reject(id: string): Promise<PaymentIntent> {
     const token = auth.getToken();
     if (!token) {
       throw new Error('Authentication token missing');
     }
     try {
-      const response = await this.client.post(`/api/v1/payment-intents/${id}/cancel`, {}, {
+      const response = await this.client.post(`/api/v1/payment-intents/${id}/reject`, {}, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined
       });
       if (response.status >= 400) {
