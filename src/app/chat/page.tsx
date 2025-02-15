@@ -304,7 +304,7 @@ export default function ChatPage() {
         }
       ]);
 
-      const processedIntent = await api.paymentIntents.process(messageText);
+      const processedIntent = await api.paymentIntents.create(messageText);
       console.log('Chat processMessage - Received response:', processedIntent);
 
       if (processedIntent.error) {
@@ -332,18 +332,19 @@ export default function ChatPage() {
             type: 'PAYMENT_INITIATION',
             data: {
               intent: {
+                payment_id: processedIntent.paymentId,
                 details: {
                   amount: processedIntent.amount,
-                  from_currency: processedIntent.from_currency,
-                  to_currency: processedIntent.to_currency,
-                  converted_amount: processedIntent.converted_amount,
-                  exchange_rate: processedIntent.exchange_rate,
-                  fees: processedIntent.fees,
-                  total_cost: processedIntent.total_cost,
+                  from_currency: String(processedIntent.fromCurrency),
+                  to_currency: String(processedIntent.toCurrency),
+                  converted_amount: processedIntent.convertedAmount,
+                  exchange_rate: processedIntent.exchangeRate,
+                  fees: processedIntent.fee,
+                  total_cost: processedIntent.totalCost,
                   payeeDetails: {
-                    name: processedIntent.beneficiary?.name || '',
-                    bankInfo: processedIntent.beneficiary?.bank_info || '',
-                    matchConfidence: processedIntent.beneficiary?.match || 0
+                    name: processedIntent.beneficiaryName || '',
+                    bankInfo: processedIntent.beneficiaryBankInfo || '',
+                    matchConfidence: processedIntent.confidence?.beneficiary || 0
                   }
                 },
                 confidence: processedIntent.confidence,

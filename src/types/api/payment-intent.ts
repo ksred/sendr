@@ -26,6 +26,7 @@ export interface PaymentSuggestion {
 }
 
 export interface ProcessedPaymentIntent {
+  payment_id: string;
   amount: string;
   bank_info: string;
   beneficiary: ProcessedBeneficiary;
@@ -47,10 +48,40 @@ export interface PaymentIntentError {
 }
 
 export interface PaymentIntent {
+  ID: number;
+  CreatedAt: string;
+  UpdatedAt: string;
+  DeletedAt: string | null;
   id: string;
+  paymentId: string;
   rawInput: string;  // Original user input
-  status: 'pending_confirmation' | 'confirmed' | 'rejected' | 'expired';
-  processed: ProcessedPaymentIntent;
+  status: string;
+  userId: number;
+  user: {
+    ID: number;
+    CreatedAt: string;
+    UpdatedAt: string;
+    DeletedAt: string | null;
+    Email: string;
+    Password: string;
+    FirstName: string;
+    LastName: string;
+    Active: boolean;
+  };
+  processedAt: string | null;
+  amount: string;
+  currency: string;
+  beneficiaryName: string;
+  beneficiaryBankInfo: string;
+  convertedAmount: string;
+  fromCurrency: string;
+  toCurrency: string;
+  exchangeRate: string;
+  fee: string;
+  totalCost: string;
+  errorDetails: string;
+  confidence: PaymentConfidence;
+  suggestions: PaymentSuggestion[];
   requiresConfirmation: boolean;
   confirmationDetails?: Array<{
     field: string;
@@ -59,8 +90,6 @@ export interface PaymentIntent {
     reason?: string;
   }>;
   expiresAt: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface CreatePaymentIntentRequest {

@@ -1,4 +1,5 @@
 import { ApiResponse, ApiError as ApiErrorType } from '@/types/api/common';
+import { PaymentIntent } from '@/types/api/payment-intent';
 
 export class ApiClientError extends Error {
   constructor(
@@ -100,11 +101,11 @@ export class ApiClient {
     const queryParams = params ? new URLSearchParams(
       Object.entries(params).reduce((acc, [key, value]) => ({
         ...acc,
-        [key]: String(value)
+        [key]: value?.toString() || ''
       }), {})
     ).toString() : '';
-    const queryString = queryParams ? `?${queryParams}` : '';
-    return this.request<T>(`${endpoint}${queryString}`);
+    
+    return this.request<T>(`${endpoint}${queryParams ? `?${queryParams}` : ''}`);
   }
 
   async post<T>(endpoint: string, data?: any, options: Omit<RequestOptions, 'method' | 'body'> = {}): Promise<T> {
@@ -122,8 +123,9 @@ export class ApiClient {
     });
   }
 
-  async delete<T>(endpoint: string): Promise<T> {
+  async delete<T>(endpoint: string, options: Omit<RequestOptions, 'method'> = {}): Promise<T> {
     return this.request<T>(endpoint, {
+      ...options,
       method: 'DELETE',
     });
   }

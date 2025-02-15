@@ -2,6 +2,8 @@
 
 import { Check, X, Edit2 } from 'lucide-react';
 import { ActionData } from '@/types/chat';
+import { useState } from 'react';
+import api from '@/lib/api';
 
 interface MessageActionProps {
   action: ActionData;
@@ -11,6 +13,8 @@ interface MessageActionProps {
 }
 
 export default function MessageAction({ action, onConfirm, onModify, onCancel }: MessageActionProps) {
+  const [isLoading, setIsLoading] = useState(false);
+
   const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -18,6 +22,35 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel }:
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount);
+  };
+
+  const handleConfirm = async () => {
+    console.log('handleConfirm', action.data.intent);
+    if (!action.data.intent?.payment_id) return;
+
+    setIsLoading(true);
+    try {
+      await api.paymentIntents.confirm(action.data.intent.payment_id);
+      onConfirm?.();
+    } catch (error) {
+      console.error('Failed to confirm payment intent:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!action.data.intent?.id) return;
+
+    setIsLoading(true);
+    try {
+      await api.paymentIntents.cancel(action.data.intent.id);
+      onCancel?.();
+    } catch (error) {
+      console.error('Failed to cancel payment intent:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const renderIntentAnalysis = () => {
@@ -74,22 +107,25 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel }:
         </div>
         <div className="flex gap-2 mt-4">
           <button
-            onClick={onConfirm}
-            className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            onClick={handleConfirm}
+            disabled={isLoading}
+            className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Confirm
+            {isLoading ? 'Processing...' : 'Confirm'}
           </button>
           <button
             onClick={onModify}
-            className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            disabled={isLoading}
+            className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Modify
           </button>
           <button
-            onClick={onCancel}
-            className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            onClick={handleCancel}
+            disabled={isLoading}
+            className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Cancel
+            {isLoading ? 'Processing...' : 'Cancel'}
           </button>
         </div>
       </div>
