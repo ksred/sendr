@@ -1,4 +1,9 @@
-import { PaymentOrder, PaymentIntent, PaymentEntities, ClarificationQuestions, ConfirmationMessage } from './payment';
+import { 
+  ChatPaymentIntent,
+  PaymentEntities, 
+  ClarificationQuestions, 
+  ConfirmationMessage 
+} from './payment';
 import { FeeStructure, ExchangeRate } from './exchange';
 
 export type ActionType =
@@ -31,7 +36,7 @@ export type ActionType =
 export interface ActionData {
   type: ActionType;
   data: {
-    intent?: PaymentIntent;
+    intent?: ChatPaymentIntent;
     entities?: PaymentEntities;
     clarification?: ClarificationQuestions;
     confirmation?: ConfirmationMessage;
@@ -49,8 +54,6 @@ export interface ActionData {
     modify?: boolean;
     cancel?: boolean;
     add?: boolean;
-    edit?: boolean;
-    delete?: boolean;
   };
 }
 
@@ -77,44 +80,13 @@ export interface Beneficiary {
   lastUsed?: string;
 }
 
-// Payment initiation specific action
-export interface PaymentInitiationAction extends ActionData {
-  type: 'PAYMENT_INITIATION' | 'ENTITY_EXTRACTION' | 'CLARIFICATION' | 'BENEFICIARY_VALIDATION' | 'RISK_ASSESSMENT';
-  data: {
-    intent?: PaymentIntent;
-    entities?: PaymentEntities;
-    clarification?: ClarificationQuestions;
-    fees?: FeeStructure;
-  };
-  options?: {
-    confirm?: boolean;
-    modify?: boolean;
-  };
-}
-
-// Payment confirmation specific action
-export interface PaymentConfirmationAction extends ActionData {
-  type: 'PAYMENT_CONFIRMATION' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLATION';
-  data: {
-    intent: PaymentIntent;
-    confirmation?: ConfirmationMessage;
-    progress: number;
-    error?: string;
-  };
-  options?: {
-    cancel?: boolean;
-  };
-}
-
-export type MessageAction = PaymentInitiationAction | PaymentConfirmationAction;
-
 export interface Message {
   text: string;
   sender: 'user' | 'system';
   timestamp: string;
   status: 'pending' | 'completed' | 'failed' | 'loading' | 'error';
-  action?: MessageAction;
-  amount?: number;
+  action?: ActionData;
+  amount?: string;
   purpose?: string;
   type?: string;
   paymentDetails?: {

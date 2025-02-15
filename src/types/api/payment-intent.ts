@@ -47,6 +47,82 @@ export interface PaymentIntentError {
   error: string;
 }
 
+export type APIPaymentIntentType = 'PAYMENT_TO_PAYEE' | 'PAYMENT_TO_SELF' | 'PAYMENT_TO_BANK';
+export type APIPaymentIntentStatus = 'created' | 'processing' | 'requires_confirmation' | 'confirmed' | 'completed' | 'failed' | 'cancelled';
+
+export interface APIPaymentIntent {
+  id: string;
+  status: APIPaymentIntentStatus;
+  type: APIPaymentIntentType;
+  amount: number;
+  sourceCurrency: string;
+  targetCurrency: string;
+  payeeDetails: {
+    name: string;
+    accountNumber: string;
+    bankCode: string;
+    bankName?: string;
+  };
+  context: {
+    marketRates: {
+      [key: string]: {
+        fromCurrency: string;
+        toCurrency: string;
+        rate: number;
+        timestamp: string;
+      };
+    };
+    fees: {
+      transferFee: number;
+      exchangeFee: number;
+      totalFee: number;
+    };
+  };
+  suggestions?: Array<{
+    field: string;
+    currentValue: any;
+    suggestedValue: any;
+    reason?: string;
+  }>;
+  expiresAt: string;
+  error?: string;
+}
+
+export interface APICreatePaymentIntentRequest {
+  amount: number;
+  sourceCurrency: string;
+  targetCurrency: string;
+  payeeDetails: {
+    name: string;
+    accountNumber: string;
+    bankCode: string;
+  };
+}
+
+export interface APIConfirmPaymentIntentRequest {
+  id: string;
+  modifications?: Partial<{
+    amount: number;
+    payeeDetails: {
+      name: string;
+      accountNumber: string;
+      bankCode: string;
+    };
+  }>;
+}
+
+export interface APIPaymentIntentValidation {
+  isValid: boolean;
+  errors: Array<{
+    field: string;
+    message: string;
+  }>;
+  warnings: Array<{
+    field: string;
+    message: string;
+  }>;
+}
+
 export interface PaymentIntent {
   ID: number;
   CreatedAt: string;
@@ -91,7 +167,7 @@ export interface PaymentIntent {
   }>;
   expiresAt: string;
   error: string;
-  type: 'PAYMENT_TO_PAYEE' | 'PAYMENT_TO_SELF' | 'PAYMENT_TO_BANK';
+  type: APIPaymentIntentType;
 }
 
 export interface CreatePaymentIntentRequest {

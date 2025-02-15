@@ -1,144 +1,153 @@
-import { Check, Loader2, AlertCircle } from 'lucide-react';
-import { PaymentIntent } from '@/types/payment';
-import { usePaymentStatus } from '@/hooks/usePaymentStatus';
+import React from 'react';
+import { ChatPaymentIntent } from '@/types/payment';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils/format';
+import { Check, X } from 'lucide-react';
 
 interface PaymentActionProps {
-  intent: PaymentIntent;
-  onConfirm?: () => void;
-  onCancel?: () => void;
+  intent: ChatPaymentIntent;
+  onConfirm: (intent: ChatPaymentIntent) => void;
+  onReject: (intent: ChatPaymentIntent) => void;
 }
 
-export function PaymentAction({ intent, onConfirm, onCancel }: PaymentActionProps) {
-  const {
-    status,
-    errorMessage,
-    handleConfirm: confirmPayment,
-    handleReject: rejectPayment,
-    getStatusStyles
-  } = usePaymentStatus(onConfirm);
-
-  const handleConfirm = async () => {
-    if (!intent?.payment_id) return;
-    await confirmPayment(intent);
-  };
-
-  const handleReject = async () => {
-    if (!intent?.payment_id) return;
-    await rejectPayment(intent, onCancel);
-  };
-
-  const {
-    amount,
-    converted_amount,
-    from_currency,
-    to_currency,
-    exchange_rate,
-    fees,
-    total_cost
-  } = intent.details || {};
-
-  // Ensure we have valid currency codes
-  const sourceCurrency = (from_currency?.toString() || intent.currency || 'USD').toUpperCase();
-  const targetCurrency = (to_currency?.toString() || intent.currency || 'USD').toUpperCase();
-
-  return (
-    <div className="mt-4 space-y-4">
-      <div className={`bg-slate-800 text-white p-4 rounded-lg space-y-3 relative transition-all duration-200 ${getStatusStyles()}`}>
-        {status === 'loading' && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-800/20 rounded-lg">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-          </div>
-        )}
-        <div className="flex items-center justify-between">
-          <h3 className={`font-semibold ${status === 'success' ? 'text-gray-400' : 'text-white'}`}>Payment Details</h3>
-          {status === 'success' && (
-            <div className="flex items-center text-green-400 gap-1.5">
-              <Check className="w-5 h-5" />
-              <span className="text-green-400 font-medium">
-                {intent?.status === 'rejected' ? 'Payment Rejected' : 'Payment Confirmed'}
-              </span>
-            </div>
-          )}
-          {status === 'error' && (
-            <div className="flex items-center text-red-400 gap-1.5">
-              <AlertCircle className="w-5 h-5" />
-              <span className="text-red-400 font-medium">Payment Failed</span>
-            </div>
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <span className={`${status === 'success' ? 'text-gray-500' : 'text-gray-400'}`}>Send Amount:</span>
-            <span className="ml-2">{formatCurrency(amount, sourceCurrency)}</span>
-          </div>
-          {sourceCurrency !== targetCurrency && (
-            <>
-              <div>
-                <span className={`${status === 'success' ? 'text-gray-500' : 'text-gray-400'}`}>Exchange Rate:</span>
-                <span className="ml-2">1 {sourceCurrency} = {exchange_rate || '-'} {targetCurrency}</span>
-              </div>
-              <div>
-                <span className={`${status === 'success' ? 'text-gray-500' : 'text-gray-400'}`}>Receive Amount:</span>
-                <span className="ml-2">{formatCurrency(converted_amount, targetCurrency)}</span>
-              </div>
-            </>
-          )}
-          <div className="col-span-2 pt-2 border-t border-gray-700">
-            <div className={`${status === 'success' ? 'text-gray-500' : 'text-gray-400'} mb-1`}>Fees:</div>
-            <div className="pl-4 text-xs space-y-1">
-              <div className="flex justify-between">
-                <span>Total Fees:</span>
-                <span>{formatCurrency(fees, sourceCurrency)}</span>
-              </div>
-            </div>
-          </div>
-          <div className="col-span-2 pt-2 border-t border-gray-700">
-            <div className="flex justify-between font-medium">
-              <span>Total to Pay:</span>
-              <span>{formatCurrency(total_cost, sourceCurrency)}</span>
-            </div>
-          </div>
-        </div>
+export function PaymentAction({ intent, onConfirm, onReject }: PaymentActionProps) {
+  const renderPaymentDetails = () => (
+    <div className="space-y-2">
+      <div className="flex justify-between items-center">
+        <span className="text-gray-600">Amount:</span>
+        <span className="font-medium">
+          {formatCurrency(parseFloat(intent.amount), intent.sourceCurrency)}
+        </span>
       </div>
-      <div className="flex gap-2 mt-4">
-        <button
-          onClick={handleConfirm}
-          disabled={status === 'loading' || status === 'success'}
-          className={`flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${status === 'error' ? 'opacity-100 hover:bg-green-500' : ''}`}
-        >
-          {status === 'loading' ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Processing...</span>
-            </>
-          ) : status === 'error' ? (
-            'Try Again'
-          ) : (
-            'Confirm'
-          )}
-        </button>
-        <button
-          onClick={handleReject}
-          disabled={status === 'loading' || status === 'success'}
-          className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
-        >
-          {status === 'loading' ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Processing...</span>
-            </>
-          ) : (
-            'Reject'
-          )}
-        </button>
+
+      {intent.sourceCurrency !== intent.targetCurrency && (
+        <div className="flex justify-between items-center">
+          <span className="text-gray-600">Converted Amount:</span>
+          <span className="font-medium">
+            {formatCurrency(parseFloat(intent.amount), intent.targetCurrency)}
+          </span>
+        </div>
+      )}
+
+      <div className="flex justify-between items-center">
+        <span className="text-gray-600">Recipient:</span>
+        <span className="font-medium">{intent.payee.name}</span>
       </div>
-      {errorMessage && status === 'error' && (
-        <div className="mt-3 text-sm text-red-400 bg-red-400/10 p-2 rounded flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-          <span>{errorMessage}</span>
+
+      {intent.payee.bankName && (
+        <div className="flex justify-between items-center">
+          <span className="text-gray-600">Bank:</span>
+          <span className="font-medium">{intent.payee.bankName}</span>
+        </div>
+      )}
+
+      {intent.fees && (
+        <>
+          <div className="flex justify-between items-center">
+            <span className="text-gray-600">Total Fees:</span>
+            <span className="font-medium">
+              {formatCurrency(parseFloat(intent.fees.total), intent.sourceCurrency)}
+            </span>
+          </div>
+
+          {intent.fees.breakdown && (
+            <div className="text-sm space-y-1">
+              {intent.fees.breakdown.transfer && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Transfer Fee:</span>
+                  <span>
+                    {formatCurrency(parseFloat(intent.fees.breakdown.transfer), intent.sourceCurrency)}
+                  </span>
+                </div>
+              )}
+              {intent.fees.breakdown.exchange && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Exchange Fee:</span>
+                  <span>
+                    {formatCurrency(parseFloat(intent.fees.breakdown.exchange), intent.sourceCurrency)}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {intent.purpose && (
+        <div className="flex justify-between items-center">
+          <span className="text-gray-600">Purpose:</span>
+          <span className="font-medium">{intent.purpose}</span>
         </div>
       )}
     </div>
+  );
+
+  const renderActions = () => (
+    <div className="flex justify-end space-x-2 mt-4">
+      <Button
+        onClick={() => onReject(intent)}
+        variant="outline"
+        className="flex items-center"
+      >
+        <X className="w-4 h-4 mr-2" />
+        Cancel
+      </Button>
+      <Button
+        onClick={() => onConfirm(intent)}
+        variant="default"
+        className="flex items-center"
+      >
+        <Check className="w-4 h-4 mr-2" />
+        Confirm
+      </Button>
+    </div>
+  );
+
+  const renderStatus = () => {
+    if (intent.status === 'processing') {
+      return (
+        <div className="mt-4">
+          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{ width: '100%' }} />
+          </div>
+          <p className="text-sm text-gray-600 mt-2 text-center">Processing payment...</p>
+        </div>
+      );
+    }
+
+    if (intent.status === 'completed') {
+      return (
+        <div className="mt-4 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 text-green-500 mb-2">
+            <Check className="w-6 h-6" />
+          </div>
+          <p className="text-green-600">Payment completed successfully</p>
+        </div>
+      );
+    }
+
+    if (intent.status === 'failed') {
+      return (
+        <div className="mt-4 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-100 text-red-500 mb-2">
+            <X className="w-6 h-6" />
+          </div>
+          <p className="text-red-600">Payment failed</p>
+          {intent.error && <p className="text-sm text-red-500 mt-1">{intent.error}</p>}
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  return (
+    <Card className="p-4">
+      <h3 className="text-lg font-semibold mb-4">Payment Details</h3>
+      {renderPaymentDetails()}
+      {renderStatus()}
+      {intent.status === 'draft' && renderActions()}
+    </Card>
   );
 }

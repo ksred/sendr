@@ -50,34 +50,34 @@ export default function ExecutionPanel() {
                 disabled={!input.trim()}
                 className="px-6 py-2.5 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                Execute
+                Continue
               </button>
             </div>
           </div>
         </form>
       ) : (
-        <div className="p-6 text-center">
-          <div className="space-y-2 mb-8">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                <CreditCard className="w-5 h-5 text-blue-600" />
-              </div>
-              <span>Smart Payment Processing</span>
+        <div className="p-6 space-y-6">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+              <MessageSquare className="w-5 h-5 text-blue-600" />
             </div>
-            <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">Make a Payment</h2>
-              <p className="text-gray-600">
-                Start a new payment with natural language
-              </p>
-              <button
-                onClick={onStart}
-                className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-              >
-                <Plus size={20} />
-                <span>Start Payment</span>
-              </button>
-            </div>
+            <span>Start a New Payment</span>
           </div>
+
+          <button
+            onClick={onStart}
+            className="w-full flex items-center justify-between px-4 py-3 bg-white/5 text-white rounded-lg hover:bg-white/10 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-blue-400" />
+              <span>Start Chat</span>
+            </div>
+            <ArrowRightCircle className="w-5 h-5" />
+          </button>
+
+          <p className="text-sm text-slate-300">
+            Use natural language to describe your payment - our AI will handle the details
+          </p>
         </div>
       )}
     </div>
