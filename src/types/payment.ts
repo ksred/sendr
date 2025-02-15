@@ -41,6 +41,7 @@ export interface PaymentIntent {
   purpose: string;
   suggestions: string[];
   total_cost: string;
+  type: string;
 }
 
 export interface PayeeInformation {

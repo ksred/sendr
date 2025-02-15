@@ -90,6 +90,8 @@ export interface PaymentIntent {
     reason?: string;
   }>;
   expiresAt: string;
+  error: string;
+  type: 'PAYMENT_TO_PAYEE' | 'PAYMENT_TO_SELF' | 'PAYMENT_TO_BANK';
 }
 
 export interface CreatePaymentIntentRequest {

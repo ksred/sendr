@@ -112,11 +112,11 @@ export interface Message {
   text: string;
   sender: 'user' | 'system';
   timestamp: string;
-  status: 'pending' | 'completed' | 'failed';
+  status: 'pending' | 'completed' | 'failed' | 'loading' | 'error';
   action?: MessageAction;
-  // Payment-specific fields
   amount?: number;
   purpose?: string;
+  type?: string;
   paymentDetails?: {
     sourceCurrency?: string;
     targetCurrency?: string;

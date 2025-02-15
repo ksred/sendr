@@ -8,6 +8,11 @@ import {
   ProcessedPaymentIntent
 } from '@/types/api/payment-intent';
 
+interface ApiResponse<T> {
+  data: T;
+  status: number;
+}
+
 export class PaymentIntentsApi {
   constructor(private client: ApiClient) { }
 
@@ -16,14 +21,14 @@ export class PaymentIntentsApi {
     console.log('PaymentIntentsApi.create - Starting request with data:', text);
     console.log('PaymentIntentsApi.create - Using auth token:', token ? 'Present' : 'Missing');
     try {
-      const response = await this.client.post('/api/v1/payment-intents', { text }, {
+      const response = await this.client.post<ApiResponse<PaymentIntent>>('/api/v1/payment-intents', { text }, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined
       });
       console.log('PaymentIntentsApi.create - Response:', response);
       if (response.status >= 400) {
         throw new Error(response.data.error || 'Failed to create payment intent');
       }
-      return response;
+      return response.data;
     } catch (error: any) {
       console.error('PaymentIntentsApi.create - Error:', error);
       if (error.response?.data?.error) {
@@ -38,9 +43,10 @@ export class PaymentIntentsApi {
     if (!token) {
       throw new Error('Authentication token missing');
     }
-    return this.client.get(`/api/v1/payment-intents/${id}`, {
+    const response = await this.client.get<ApiResponse<PaymentIntent>>(`/api/v1/payment-intents/${id}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined
     });
+    return response.data;
   }
 
   async confirm(id: string): Promise<PaymentIntent> {
@@ -49,13 +55,13 @@ export class PaymentIntentsApi {
       throw new Error('Authentication token missing');
     }
     try {
-      const response = await this.client.post(`/api/v1/payment-intents/${id}/confirm`, {}, {
+      const response = await this.client.post<ApiResponse<PaymentIntent>>(`/api/v1/payment-intents/${id}/confirm`, {}, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined
       });
       if (response.status >= 400) {
         throw new Error(response.data.error || 'Failed to confirm payment intent');
       }
-      return response;
+      return response.data;
     } catch (error: any) {
       console.error('PaymentIntentsApi.confirm - Error:', error);
       if (error.response?.data?.error) {
@@ -71,13 +77,13 @@ export class PaymentIntentsApi {
       throw new Error('Authentication token missing');
     }
     try {
-      const response = await this.client.post(`/api/v1/payment-intents/${id}/reject`, {}, {
+      const response = await this.client.post<ApiResponse<PaymentIntent>>(`/api/v1/payment-intents/${id}/reject`, {}, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined
       });
       if (response.status >= 400) {
         throw new Error(response.data.error || 'Failed to cancel payment intent');
       }
-      return response;
+      return response.data;
     } catch (error: any) {
       console.error('PaymentIntentsApi.cancel - Error:', error);
       if (error.response?.data?.error) {
@@ -92,46 +98,21 @@ export class PaymentIntentsApi {
     if (!token) {
       throw new Error('Authentication token missing');
     }
-    return this.client.get(`/api/v1/payment-intents/${id}/validate`, {
+    const response = await this.client.get<ApiResponse<PaymentIntentValidation>>(`/api/v1/payment-intents/${id}/validate`, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined
     });
+    return response.data;
   }
 
   // Get suggested corrections or alternatives for the payment intent
-  async getSuggestions(id: string): Promise<{
-    alternatives: Array<{
-      field: string;
-      currentValue: any;
-      suggestedValue: any;
-      reason: string;
-    }>;
-  }> {
-    return this.client.get(`/api/v1/payment-intents/${id}/suggestions`);
+  async getSuggestions(id: string): Promise<ProcessedPaymentIntent[]> {
+    const token = auth.getToken();
+    if (!token) {
+      throw new Error('Authentication token missing');
+    }
+    const response = await this.client.get<ApiResponse<ProcessedPaymentIntent[]>>(`/api/v1/payment-intents/${id}/suggestions`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined
+    });
+    return response.data;
   }
-
-  // async process(text: string): Promise<ProcessedPaymentIntent> {
-  //   const token = auth.getToken();
-  //   console.log('PaymentIntentsApi.process - Starting request with text:', text);
-  //   console.log('PaymentIntentsApi.process - Using auth token:', token ? 'Present' : 'Missing');
-
-  //   try {
-  //     const response = await this.client.post('/api/v1/payment-intents/',
-  //       { text },
-  //       { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
-  //     );
-  //     console.log('PaymentIntentsApi.process - Response:', response);
-
-  //     if (response.status >= 400) {
-  //       throw new Error(response.data.error || 'Failed to process payment intent');
-  //     }
-
-  //     return response;
-  //   } catch (error: any) {
-  //     console.error('PaymentIntentsApi.process - Error:', error);
-  //     if (error.response?.data?.error) {
-  //       throw new Error(error.response.data.error);
-  //     }
-  //     throw error;
-  //   }
-  // }
 }
