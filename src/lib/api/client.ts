@@ -55,6 +55,15 @@ export class ApiClient {
       const responseData = await response.json();
       console.log('ApiClient.request - Raw response:', responseData);
 
+      // If response contains an error, throw it
+      if (responseData.error) {
+        throw new ApiClientError(
+          'API_ERROR',
+          responseData.error,
+          responseData
+        );
+      }
+
       // Check if response is already in the expected format
       if (responseData && typeof responseData === 'object' && !responseData.hasOwnProperty('success')) {
         // If response is not wrapped in ApiResponse format, wrap it

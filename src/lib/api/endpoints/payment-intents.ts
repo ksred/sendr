@@ -48,9 +48,21 @@ export class PaymentIntentsApi {
     if (!token) {
       throw new Error('Authentication token missing');
     }
-    return this.client.post(`/api/v1/payment-intents/${id}/confirm`, {}, {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined
-    });
+    try {
+      const response = await this.client.post(`/api/v1/payment-intents/1${id}/confirm`, {}, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined
+      });
+      if (response.status >= 400) {
+        throw new Error(response.data.error || 'Failed to confirm payment intent');
+      }
+      return response;
+    } catch (error: any) {
+      console.error('PaymentIntentsApi.confirm - Error:', error);
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      }
+      throw error;
+    }
   }
 
   async cancel(id: string): Promise<PaymentIntent> {
@@ -58,9 +70,21 @@ export class PaymentIntentsApi {
     if (!token) {
       throw new Error('Authentication token missing');
     }
-    return this.client.post(`/api/v1/payment-intents/${id}/cancel`, {}, {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined
-    });
+    try {
+      const response = await this.client.post(`/api/v1/payment-intents/${id}/cancel`, {}, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined
+      });
+      if (response.status >= 400) {
+        throw new Error(response.data.error || 'Failed to cancel payment intent');
+      }
+      return response;
+    } catch (error: any) {
+      console.error('PaymentIntentsApi.cancel - Error:', error);
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      }
+      throw error;
+    }
   }
 
   async validate(id: string): Promise<PaymentIntentValidation> {

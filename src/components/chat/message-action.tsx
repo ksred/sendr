@@ -1,9 +1,9 @@
 'use client';
 
-import { Check, X, Edit2 } from 'lucide-react';
+import { Check, X, Edit2, Loader2, AlertCircle } from 'lucide-react';
 import { ActionData } from '@/types/chat';
 import { useState } from 'react';
-import api from '@/lib/api';
+import api, { ApiClientError } from '@/lib/api';
 
 interface MessageActionProps {
   action: ActionData;
@@ -12,8 +12,12 @@ interface MessageActionProps {
   onCancel?: () => void;
 }
 
+type Status = 'idle' | 'loading' | 'success' | 'error';
+
 export default function MessageAction({ action, onConfirm, onModify, onCancel }: MessageActionProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<Status>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat('en-US', {
@@ -28,28 +32,33 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel }:
     console.log('handleConfirm', action.data.intent);
     if (!action.data.intent?.payment_id) return;
 
-    setIsLoading(true);
+    setStatus('loading');
+    setErrorMessage(null);
     try {
       await api.paymentIntents.confirm(action.data.intent.payment_id);
+      setStatus('success');
       onConfirm?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to confirm payment intent:', error);
-    } finally {
-      setIsLoading(false);
+      setStatus('error');
+      setErrorMessage(error.message || 'Failed to confirm payment. Please try again.');
     }
   };
 
   const handleCancel = async () => {
-    if (!action.data.intent?.id) return;
+    console.log('handleCancel', action.data.intent);
+    if (!action.data.intent?.payment_id) return;
 
-    setIsLoading(true);
+    setStatus('loading');
+    setErrorMessage(null);
     try {
-      await api.paymentIntents.cancel(action.data.intent.id);
+      await api.paymentIntents.cancel(action.data.intent.payment_id);
+      setStatus('success');
       onCancel?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to cancel payment intent:', error);
-    } finally {
-      setIsLoading(false);
+      setStatus('error');
+      setErrorMessage(error.message || 'Failed to cancel payment. Please try again.');
     }
   };
 
@@ -67,29 +76,63 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel }:
       total_cost
     } = intent.details;
 
+    const getStatusStyles = () => {
+      switch (status) {
+        case 'loading':
+          return 'opacity-50';
+        case 'success':
+          return 'border border-green-400/30';
+        case 'error':
+          return 'border border-red-400/30';
+        default:
+          return '';
+      }
+    };
+
     return (
       <div className="mt-4 space-y-4">
-        <div className="bg-slate-800 text-white p-4 rounded-lg space-y-3">
-          <h3 className="font-semibold">Payment Details</h3>
+        <div className={`bg-slate-800 text-white p-4 rounded-lg space-y-3 relative transition-all duration-200 ${getStatusStyles()}`}>
+          {status === 'loading' && (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-800/20 rounded-lg">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <h3 className={`font-semibold ${status === 'success' ? 'text-gray-400' : 'text-white'}`}>Payment Details</h3>
+            {status === 'success' && (
+              <div className="flex items-center text-green-400 gap-1.5">
+                <Check className="w-5 h-5" />
+                <span className="text-green-400 font-medium">
+                  {action.data.intent?.status === 'cancelled' ? 'Payment Cancelled' : 'Payment Confirmed'}
+                </span>
+              </div>
+            )}
+            {status === 'error' && (
+              <div className="flex items-center text-red-400 gap-1.5">
+                <AlertCircle className="w-5 h-5" />
+                <span className="text-red-400 font-medium">Payment Failed</span>
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <span className="text-gray-400">Send Amount:</span>
+              <span className={`${status === 'success' ? 'text-gray-500' : 'text-gray-400'}`}>Send Amount:</span>
               <span className="ml-2">{formatCurrency(parseFloat(amount), from_currency)}</span>
             </div>
             {from_currency !== to_currency && (
               <>
                 <div>
-                  <span className="text-gray-400">Exchange Rate:</span>
+                  <span className={`${status === 'success' ? 'text-gray-500' : 'text-gray-400'}`}>Exchange Rate:</span>
                   <span className="ml-2">1 {from_currency} = {exchange_rate} {to_currency}</span>
                 </div>
                 <div>
-                  <span className="text-gray-400">Receive Amount:</span>
+                  <span className={`${status === 'success' ? 'text-gray-500' : 'text-gray-400'}`}>Receive Amount:</span>
                   <span className="ml-2">{formatCurrency(parseFloat(converted_amount), to_currency)}</span>
                 </div>
               </>
             )}
             <div className="col-span-2 pt-2 border-t border-gray-700">
-              <div className="text-gray-400 mb-1">Fees:</div>
+              <div className={`${status === 'success' ? 'text-gray-500' : 'text-gray-400'} mb-1`}>Fees:</div>
               <div className="pl-4 text-xs space-y-1">
                 <div className="flex justify-between">
                   <span>Total Fees:</span>
@@ -108,26 +151,49 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel }:
         <div className="flex gap-2 mt-4">
           <button
             onClick={handleConfirm}
-            disabled={isLoading}
-            className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={status === 'loading' || status === 'success'}
+            className={`flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${status === 'error' ? 'opacity-100 hover:bg-green-500' : ''}`}
           >
-            {isLoading ? 'Processing...' : 'Confirm'}
+            {status === 'loading' ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Processing...</span>
+              </>
+            ) : status === 'error' ? (
+              'Try Again'
+            ) : (
+              'Confirm'
+            )}
           </button>
           <button
             onClick={onModify}
-            disabled={isLoading}
-            className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={status === 'loading' || status === 'success'}
+            className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center"
           >
+            <Edit2 className="w-4 h-4 mr-2" />
             Modify
           </button>
           <button
             onClick={handleCancel}
-            disabled={isLoading}
-            className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={status === 'loading' || status === 'success'}
+            className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
           >
-            {isLoading ? 'Processing...' : 'Cancel'}
+            {status === 'loading' ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Processing...</span>
+              </>
+            ) : (
+              'Cancel'
+            )}
           </button>
         </div>
+        {errorMessage && status === 'error' && (
+          <div className="mt-3 text-sm text-red-400 bg-red-400/10 p-2 rounded flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
       </div>
     );
   };
