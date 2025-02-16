@@ -30,260 +30,90 @@ const DEMO_COMMANDS = [
   { command: "send 500k eur to john", description: "Start a new payment" },
   { command: "transfer €1000 to alice", description: "Make a transfer in EUR" },
   { command: "pay $500 to bob", description: "Make a payment in USD" },
-  { command: "show my recent payments", description: "View payment history" }
+  { command: "show my recent payments", description: "View payment history" },
+  { command: "show payment intents", description: "View all payment intents" }
 ];
 
-const DEMO_RESPONSES: Record<string, ChatMessage> = {
-  "send 500k eur to john": {
-    text: "I'll help you send €500,000 to John. Here's the payment analysis:",
-    sender: 'system',
-    timestamp: new Date().toISOString(),
-    status: 'completed',
-    action: {
-      type: 'PAYMENT_INITIATION',
-      data: {
-        intent: {
-          type: 'PAYMENT_TO_PAYEE',
-          details: {
-            amount: 500000,
-            sourceCurrency: 'USD',
-            targetCurrency: 'EUR',
-            payeeDetails: {
-              name: 'John Smith',
-              accountNumber: 'DE89370400440532013000',
-              bankCode: 'DEUTDEFF'
-            }
-          },
-          context: {
-            marketRates: {
-              USDEUR: {
-                fromCurrency: 'USD',
-                toCurrency: 'EUR',
-                rate: 0.92,
-                timestamp: new Date(),
-                spread: 0.001
-              },
-              EURUSD: {
-                fromCurrency: 'EUR',
-                toCurrency: 'USD',
-                rate: 1.09,
-                timestamp: new Date(),
-                spread: 0.001
-              }
-            },
-            userHistory: {
-              recentTransactions: [],
-              preferredCurrencies: ['USD', 'EUR'],
-              riskProfile: 'MEDIUM',
-              paymentFrequency: 0,
-              averagePaymentSize: 0
-            },
-            accountContext: {
-              balances: {},
-              limits: {
-                daily: 1000000,
-                monthly: 5000000,
-                perTransaction: 1000000
-              },
-              utilizationRate: 0,
-              status: 'ACTIVE'
-            }
-          }
-        },
-        fees: {
-          baseFee: 0,
-          feePercentage: 0.5,
-          minimumFee: 10,
-          estimatedTotal: 2500,
-          breakdown: {
-            exchangeFee: 1500,
-            networkFee: 500,
-            processingFee: 500
-          }
-        }
-      },
-      options: {
-        confirm: true,
-        modify: true
-      }
-    }
-  },
-  "transfer €1000 to alice": {
-    text: "I'll help you transfer €1,000 to Alice. Here's the payment analysis:",
-    sender: 'system',
-    timestamp: new Date().toISOString(),
-    status: 'completed',
-    action: {
-      type: 'PAYMENT_INITIATION',
-      data: {
-        intent: {
-          type: 'PAYMENT_TO_PAYEE',
-          details: {
-            amount: 1000,
-            sourceCurrency: 'USD',
-            targetCurrency: 'EUR',
-            payeeDetails: {
-              name: 'Alice Johnson',
-              accountNumber: 'FR7630006000011234567890189',
-              bankCode: 'BNPAFRPP'
-            }
-          },
-          context: {
-            marketRates: {
-              USDEUR: {
-                fromCurrency: 'USD',
-                toCurrency: 'EUR',
-                rate: 0.92,
-                timestamp: new Date(),
-                spread: 0.001
-              },
-              EURUSD: {
-                fromCurrency: 'EUR',
-                toCurrency: 'USD',
-                rate: 1.09,
-                timestamp: new Date(),
-                spread: 0.001
-              }
-            },
-            userHistory: {
-              recentTransactions: [],
-              preferredCurrencies: ['USD', 'EUR'],
-              riskProfile: 'MEDIUM',
-              paymentFrequency: 0,
-              averagePaymentSize: 0
-            },
-            accountContext: {
-              balances: {},
-              limits: {
-                daily: 1000000,
-                monthly: 5000000,
-                perTransaction: 1000000
-              },
-              utilizationRate: 0,
-              status: 'ACTIVE'
-            }
-          }
-        },
-        fees: {
-          baseFee: 0,
-          feePercentage: 0.5,
-          minimumFee: 10,
-          estimatedTotal: 5,
-          breakdown: {
-            exchangeFee: 3,
-            networkFee: 1,
-            processingFee: 1
-          }
-        }
-      },
-      options: {
-        confirm: true,
-        modify: true
-      }
-    }
-  },
-  "pay $500 to bob": {
-    text: "I'll help you send $500 to Bob. Here's the payment analysis:",
-    sender: 'system',
-    timestamp: new Date().toISOString(),
-    status: 'completed',
-    action: {
-      type: 'PAYMENT_INITIATION',
-      data: {
-        intent: {
-          type: 'PAYMENT_TO_PAYEE',
-          details: {
-            amount: 500,
-            sourceCurrency: 'USD',
-            targetCurrency: 'USD',
-            payeeDetails: {
-              name: 'Bob Williams',
-              accountNumber: '8529147036',
-              bankCode: 'CHASUS33'
-            }
-          },
-          context: {
-            marketRates: {
-              USDUSD: {
-                fromCurrency: 'USD',
-                toCurrency: 'USD',
-                rate: 1,
-                timestamp: new Date(),
-                spread: 0
-              }
-            },
-            userHistory: {
-              recentTransactions: [],
-              preferredCurrencies: ['USD'],
-              riskProfile: 'MEDIUM',
-              paymentFrequency: 0,
-              averagePaymentSize: 0
-            },
-            accountContext: {
-              balances: {},
-              limits: {
-                daily: 1000000,
-                monthly: 5000000,
-                perTransaction: 1000000
-              },
-              utilizationRate: 0,
-              status: 'ACTIVE'
-            }
-          }
-        },
-        fees: {
-          baseFee: 0,
-          feePercentage: 0.5,
-          minimumFee: 10,
-          estimatedTotal: 10,
-          breakdown: {
-            exchangeFee: 0,
-            networkFee: 5,
-            processingFee: 5
-          }
-        }
-      },
-      options: {
-        confirm: true,
-        modify: true
-      }
-    }
-  }
-};
-
-const findMatchingCommand = (input: string): string | null => {
-  const normalizedInput = input.toLowerCase().replace(/[€$]/g, '');
-
-  if (DEMO_RESPONSES[input]) {
-    return input;
-  }
-
-  for (const key of Object.keys(DEMO_RESPONSES)) {
-    if (key.toLowerCase().replace(/[€$]/g, '') === normalizedInput) {
-      return key;
-    }
-  }
-
-  return null;
-};
-
 export default function ChatPage() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [paymentIntents, setPaymentIntents] = useState<PaymentIntent[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
-  const initialMessageProcessed = useRef(false);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isProcessing]);
+    const loadPaymentIntents = async () => {
+      try {
+        const intents = await api.paymentIntents.list();
+        setPaymentIntents(intents);
+        setMessages([
+          {
+            text: "Welcome! I'm here to help you with payments. Here are your current payment intents:",
+            sender: 'system',
+            timestamp: new Date().toISOString(),
+            status: 'completed',
+            action: {
+              type: 'SHOW_PAYMENT_INTENTS',
+              data: {
+                paymentIntents: intents
+              }
+            }
+          }
+        ]);
+      } catch (error) {
+        console.error('Failed to load payment intents:', error);
+        setMessages([
+          {
+            text: "Welcome! I'm here to help you with payments.",
+            sender: 'system',
+            timestamp: new Date().toISOString(),
+            status: 'completed'
+          }
+        ]);
+      }
+    };
+
+    loadPaymentIntents();
+  }, []);
+
+  // Handle showing payment intents in chat
+  const handleShowPaymentIntents = async () => {
+    try {
+      const intents = await api.paymentIntents.list();
+      setPaymentIntents(intents);
+      setMessages(prev => [...prev, {
+        text: "Here are your current payment intents:",
+        sender: 'system',
+        timestamp: new Date().toISOString(),
+        status: 'completed',
+        action: {
+          type: 'SHOW_PAYMENT_INTENTS',
+          data: {
+            paymentIntents: intents
+          }
+        }
+      }]);
+    } catch (error) {
+      console.error('Failed to load payment intents:', error);
+      setMessages(prev => [...prev, {
+        text: "Sorry, I couldn't load your payment intents at this time.",
+        sender: 'system',
+        timestamp: new Date().toISOString(),
+        status: 'completed'
+      }]);
+    }
+  };
+
+  const findMatchingCommand = (input: string): string | null => {
+    const normalizedInput = input.toLowerCase().trim();
+    if (normalizedInput === 'show payment intents' || normalizedInput === 'show my payment intents') {
+      handleShowPaymentIntents();
+      return 'show payment intents';
+    }
+    return null;
+  };
 
   const processMessage = async (messageText: string) => {
     try {
@@ -373,18 +203,17 @@ export default function ChatPage() {
 
   useEffect(() => {
     const initialMessage = searchParams.get('message');
-    if (initialMessage && !initialMessageProcessed.current) {
-      initialMessageProcessed.current = true;
+    if (initialMessage) {
       processMessage(initialMessage);
     }
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || isProcessing) return;
+    if (!input.trim() || isLoading) return;
 
-    await processMessage(newMessage);
-    setNewMessage('');
+    await processMessage(input);
+    setInput('');
   };
 
   const handleConfirm = () => {
@@ -417,7 +246,7 @@ export default function ChatPage() {
       <AccountOverview />
 
       <div
-        ref={chatContainerRef}
+        ref={messagesEndRef}
         className="flex-1 overflow-y-auto"
         style={{
           scrollbarWidth: 'thin',
@@ -479,8 +308,8 @@ export default function ChatPage() {
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <input
             type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
             placeholder="Type your message..."
             className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:border-blue-500"
           />

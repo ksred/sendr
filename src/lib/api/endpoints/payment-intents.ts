@@ -109,6 +109,28 @@ export class PaymentIntentsApi {
     return this.client.get(`/api/v1/payment-intents/${id}/suggestions`);
   }
 
+  async list(): Promise<PaymentIntent[]> {
+    const token = auth.getToken();
+    if (!token) {
+      throw new Error('Authentication token missing');
+    }
+    try {
+      const response = await this.client.get('/api/v1/payment-intents', {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined
+      });
+      if (response.status >= 400) {
+        throw new Error(response.data.error || 'Failed to list payment intents');
+      }
+      return response;
+    } catch (error: any) {
+      console.error('PaymentIntentsApi.list - Error:', error);
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      }
+      throw error;
+    }
+  }
+
   // async process(text: string): Promise<ProcessedPaymentIntent> {
   //   const token = auth.getToken();
   //   console.log('PaymentIntentsApi.process - Starting request with text:', text);

@@ -4,6 +4,7 @@ import { Check, X, Edit2, Loader2, AlertCircle } from 'lucide-react';
 import { ActionData } from '@/types/chat';
 import { useState } from 'react';
 import api, { ApiClientError } from '@/lib/api';
+import { PaymentIntentList } from '@/components/payments/payment-intent-list';
 
 interface MessageActionProps {
   action: ActionData;
@@ -229,6 +230,12 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel }:
     case 'COMPLETED':
     case 'FAILED':
       return renderProgress();
+    case 'SHOW_PAYMENT_INTENTS':
+      return (
+        <div className="w-full max-w-2xl mx-auto">
+          <PaymentIntentList intents={action.data.paymentIntents} />
+        </div>
+      );
     default:
       return null;
   }
