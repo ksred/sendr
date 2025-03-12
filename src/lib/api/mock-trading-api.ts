@@ -109,3 +109,36 @@ class MockTradingApi {
 }
 
 export const tradingApi = new MockTradingApi();
+
+// Import the API client
+import api from './index';
+
+/**
+ * Test function to verify the API connection works with a provided token
+ * @param text The text message to process
+ * @param token The JWT token to use for authorization
+ */
+export async function testProcessAPI(text: string, token: string) {
+  try {
+    // Set the token directly on the API client
+    api.setAuthToken(token);
+    
+    // Make the API call
+    const response = await api.paymentIntents.process(text);
+    
+    console.log('API test successful:', response);
+    return response;
+  } catch (error) {
+    console.error('API test failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Example of using the function:
+ * 
+ * import { testProcessAPI } from '@/lib/api/mock-trading-api';
+ * 
+ * const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NDE4NzUzNTUsImlhdCI6MTc0MTc4ODk1NSwic3ViIjoyfQ.uRjSwYbpHIjntDnXrC00zeE_j4h3uC_EHlUCAkhxE_4';
+ * const result = await testProcessAPI('buy 100 eur', token);
+ */

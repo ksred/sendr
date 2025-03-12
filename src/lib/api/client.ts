@@ -26,15 +26,24 @@ export class ApiClient {
     this.baseUrl = baseUrl;
     this.apiKey = apiKey;
   }
+  
+  setAuthToken(token: string) {
+    this.apiKey = token;
+  }
 
   private async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
+    // If the endpoint already starts with http:// or https://, use it as is
+    const url = endpoint.startsWith('http://') || endpoint.startsWith('https://') 
+      ? endpoint 
+      : `${this.baseUrl}${endpoint}`;
+    
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...options.headers,
     };
 
-    if (this.apiKey) {
+    // Only add Authorization header if not already provided in options.headers
+    if (this.apiKey && !options.headers?.Authorization) {
       headers['Authorization'] = `Bearer ${this.apiKey}`;
     }
 
@@ -93,7 +102,7 @@ export class ApiClient {
       }
 
       return data.data || responseData as T;
-    } catch (error) {
+    } catch (error: any) {
       console.error('ApiClient.request - Fetch error:', error);
       if (error instanceof ApiClientError) {
         throw error;
@@ -106,15 +115,11 @@ export class ApiClient {
     }
   }
 
-  async get<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
-    const queryParams = params ? new URLSearchParams(
-      Object.entries(params).reduce((acc, [key, value]) => ({
-        ...acc,
-        [key]: value?.toString() || ''
-      }), {})
-    ).toString() : '';
-    
-    return this.request<T>(`${endpoint}${queryParams ? `?${queryParams}` : ''}`);
+  async get<T>(endpoint: string, options: Omit<RequestOptions, 'method' | 'body'> = {}): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: 'GET'
+    });
   }
 
   async post<T>(endpoint: string, data?: any, options: Omit<RequestOptions, 'method' | 'body'> = {}): Promise<T> {

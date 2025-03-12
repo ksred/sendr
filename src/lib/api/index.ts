@@ -21,6 +21,10 @@ export class Api {
     this.exchange = new ExchangeApi(this.client);
     this.paymentIntents = new PaymentIntentsApi(this.client);
   }
+  
+  setAuthToken(token: string) {
+    this.client.setAuthToken(token);
+  }
 }
 
 // Create and export a default instance

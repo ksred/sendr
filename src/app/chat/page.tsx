@@ -134,14 +134,15 @@ export default function ChatPage() {
         }
       ]);
 
-      const processedIntent = await api.paymentIntents.create(messageText);
+      // Use the process endpoint instead of create
+      const processedIntent = await api.paymentIntents.process(messageText);
       console.log('Chat processMessage - Received response:', processedIntent);
 
       if (processedIntent.error) {
         setMessages(prev => {
           const withoutLoading = prev.filter(msg => !msg.isLoading);
           return [...withoutLoading, {
-            text: `Sorry, I couldn't process your payment request: ${processedIntent.error}`,
+            text: `Sorry, I couldn't process your request: ${processedIntent.error}`,
             sender: 'system',
             timestamp: new Date().toISOString(),
             status: 'error'
@@ -153,34 +154,133 @@ export default function ChatPage() {
       setMessages(prev => {
         const withoutLoading = prev.filter(msg => !msg.isLoading);
         console.log('Chat processMessage - Creating response message with intent:', processedIntent);
+
+        // Handle different intent types based on the API response
+        const intentType = processedIntent.intent_type;
+        let responseText = "Here's what I found based on your request:";
+        let actionType: ActionType = 'PAYMENT_INITIATION';
+        let actionData: ActionData = { intent: {} };
+
+        // Handle different intent types from api.md specs
+        if (intentType === 'payment') {
+          const result = processedIntent.result || {};
+          actionData = {
+            intent: {
+              payment_id: result.id || '',
+              details: {
+                amount: result.amount || '0',
+                status: 'pending',
+                from_currency: result.currency || 'USD',
+                to_currency: result.currency || 'USD',
+                converted_amount: result.amount || '0',
+                exchange_rate: result.exchange_rate || '1',
+                fees: result.fee || '0',
+                total_cost: result.amount || '0',
+                payeeDetails: {
+                  name: result.beneficiary_name || '',
+                  bankInfo: '',
+                  matchConfidence: result.confidence?.beneficiary || 0
+                }
+              },
+              confidence: result.confidence || {},
+            }
+          };
+        } else if (intentType === 'buy_foreign_currency') {
+          const result = processedIntent.result || {};
+          actionType = 'CURRENCY_EXCHANGE';
+          actionData = {
+            intent: {
+              payment_id: '',
+              details: {
+                amount: result.amount || '0',
+                status: 'pending',
+                from_currency: result.from_currency || 'USD',
+                to_currency: result.to_currency || 'EUR',
+                converted_amount: result.converted_amount || '0',
+                exchange_rate: result.rate || '1',
+                fees: result.fee || '0',
+                total_cost: result.total_cost || '0',
+              },
+              confidence: result.confidence || {},
+            }
+          };
+        } else if (intentType === 'show_beneficiary') {
+          actionType = 'SHOW_BENEFICIARIES';
+          responseText = "Here are the beneficiaries I found:";
+          
+          // Debug the result to understand structure
+          console.log('show_beneficiary raw result:', processedIntent.result);
+          
+          actionData = {
+            beneficiaries: Array.isArray(processedIntent.result) 
+              ? processedIntent.result.map((item: any) => {
+                  // Handle different casing in the API response (Beneficiary vs beneficiary)
+                  const ben = item.Beneficiary || item.beneficiary || item;
+                  console.log('Extracted beneficiary:', ben);
+                  return {
+                    id: ben.id || 0,
+                    name: ben.name || 'Unknown',
+                    bank_info: ben.bank_info || 'No bank information',
+                    currency: ben.currency || 'Unknown currency'
+                  };
+                }) 
+              : []
+          };
+        } else if (intentType === 'create_beneficiary') {
+          actionType = 'SHOW_BENEFICIARIES';
+          responseText = "I've created a new beneficiary:";
+          // For create_beneficiary, the result is a single beneficiary object, not an array
+          const beneficiary = processedIntent.result || {};
+          actionData = {
+            beneficiaries: [{
+              id: beneficiary.id || 0,
+              name: beneficiary.name || 'Unknown',
+              bank_info: `${beneficiary.bank_name || ''} - ${beneficiary.account_number || ''}`,
+              currency: beneficiary.currency || 'USD'
+            }]
+          };
+        } else if (intentType === 'list_transactions') {
+          actionType = 'SHOW_TRANSACTIONS';
+          responseText = "Here are the transactions I found:";
+          
+          // Debug the result to understand structure
+          console.log('list_transactions raw result:', processedIntent.result);
+          
+          // The result is either an array of transactions directly or nested in a 'transactions' property
+          let transactions = [];
+          
+          if (Array.isArray(processedIntent.result)) {
+            // Result is directly an array of transactions
+            transactions = processedIntent.result;
+          } else if (processedIntent.result && processedIntent.result.transactions) {
+            // Result has a 'transactions' property
+            transactions = processedIntent.result.transactions;
+          }
+          
+          // Map the transactions to a consistent format
+          actionData = {
+            transactions: transactions.map((tx: any) => ({
+              id: tx.id || `tx-${Math.random().toString(36).substr(2, 9)}`,
+              date: tx.created_at || tx.date || new Date().toISOString(),
+              amount: tx.amount || '0',
+              currency: tx.currency || 'USD',
+              beneficiary: tx.description || tx.beneficiary || 'Unknown recipient',
+              type: tx.type || 'payment',
+              status: tx.status || 'completed'
+            }))
+          };
+          
+          console.log('Processed transactions:', actionData.transactions);
+        }
+
         const response: ChatMessage = {
-          text: "Here's what I found based on your payment request:",
+          text: responseText,
           sender: 'system',
           timestamp: new Date().toISOString(),
           status: 'completed',
           action: {
-            type: 'PAYMENT_INITIATION',
-            data: {
-              intent: {
-                payment_id: processedIntent.paymentId,
-                details: {
-                  amount: processedIntent.amount,
-                  status: processedIntent.status,
-                  from_currency: String(processedIntent.fromCurrency),
-                  to_currency: String(processedIntent.toCurrency),
-                  converted_amount: processedIntent.convertedAmount,
-                  exchange_rate: processedIntent.exchangeRate,
-                  fees: processedIntent.fee,
-                  total_cost: processedIntent.totalCost,
-                  payeeDetails: {
-                    name: processedIntent.beneficiaryName || '',
-                    bankInfo: processedIntent.beneficiaryBankInfo || '',
-                    matchConfidence: processedIntent.confidence?.beneficiary || 0
-                  }
-                },
-                confidence: processedIntent.confidence,
-              }
-            }
+            type: actionType,
+            data: actionData
           }
         };
         console.log('Chat processMessage - Created response message:', response);

@@ -16,13 +16,10 @@ export class PaymentIntentsApi {
     console.log('PaymentIntentsApi.create - Starting request with data:', text);
     console.log('PaymentIntentsApi.create - Using auth token:', token ? 'Present' : 'Missing');
     try {
-      const response = await this.client.post('/api/v1/payment-intents', { text }, {
+      const response = await this.client.post<PaymentIntent>('/api/v1/payment-intents', { text }, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined
       });
       console.log('PaymentIntentsApi.create - Response:', response);
-      if (response.status >= 400) {
-        throw new Error(response.data.error || 'Failed to create payment intent');
-      }
       return response;
     } catch (error: any) {
       console.error('PaymentIntentsApi.create - Error:', error);
@@ -38,8 +35,8 @@ export class PaymentIntentsApi {
     if (!token) {
       throw new Error('Authentication token missing');
     }
-    return this.client.get(`/api/v1/payment-intents/${id}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined
+    return this.client.get<PaymentIntent>(`/api/v1/payment-intents/${id}`, {
+      headers: { Authorization: `Bearer ${token}` }
     });
   }
 
@@ -49,12 +46,9 @@ export class PaymentIntentsApi {
       throw new Error('Authentication token missing');
     }
     try {
-      const response = await this.client.post(`/api/v1/payment-intents/${id}/confirm`, {}, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined
+      const response = await this.client.post<PaymentIntent>(`/api/v1/payment-intents/${id}/confirm`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      if (response.status >= 400) {
-        throw new Error(response.data.error || 'Failed to confirm payment intent');
-      }
       return response;
     } catch (error: any) {
       console.error('PaymentIntentsApi.confirm - Error:', error);
@@ -71,12 +65,9 @@ export class PaymentIntentsApi {
       throw new Error('Authentication token missing');
     }
     try {
-      const response = await this.client.post(`/api/v1/payment-intents/${id}/reject`, {}, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined
+      const response = await this.client.post<PaymentIntent>(`/api/v1/payment-intents/${id}/reject`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      if (response.status >= 400) {
-        throw new Error(response.data.error || 'Failed to cancel payment intent');
-      }
       return response;
     } catch (error: any) {
       console.error('PaymentIntentsApi.cancel - Error:', error);
@@ -92,8 +83,8 @@ export class PaymentIntentsApi {
     if (!token) {
       throw new Error('Authentication token missing');
     }
-    return this.client.get(`/api/v1/payment-intents/${id}/validate`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined
+    return this.client.get<PaymentIntentValidation>(`/api/v1/payment-intents/${id}/validate`, {
+      headers: { Authorization: `Bearer ${token}` }
     });
   }
 
@@ -106,7 +97,14 @@ export class PaymentIntentsApi {
       reason: string;
     }>;
   }> {
-    return this.client.get(`/api/v1/payment-intents/${id}/suggestions`);
+    return this.client.get<{
+      alternatives: Array<{
+        field: string;
+        currentValue: any;
+        suggestedValue: any;
+        reason: string;
+      }>;
+    }>(`/api/v1/payment-intents/${id}/suggestions`);
   }
 
   async list(): Promise<PaymentIntent[]> {
@@ -115,12 +113,9 @@ export class PaymentIntentsApi {
       throw new Error('Authentication token missing');
     }
     try {
-      const response = await this.client.get('/api/v1/payment-intents', {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined
+      const response = await this.client.get<PaymentIntent[]>('/api/v1/payment-intents', {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      if (response.status >= 400) {
-        throw new Error(response.data.error || 'Failed to list payment intents');
-      }
       return response;
     } catch (error: any) {
       console.error('PaymentIntentsApi.list - Error:', error);
@@ -131,29 +126,28 @@ export class PaymentIntentsApi {
     }
   }
 
-  // async process(text: string): Promise<ProcessedPaymentIntent> {
-  //   const token = auth.getToken();
-  //   console.log('PaymentIntentsApi.process - Starting request with text:', text);
-  //   console.log('PaymentIntentsApi.process - Using auth token:', token ? 'Present' : 'Missing');
+  async process(text: string, customToken?: string): Promise<ProcessedPaymentIntent> {
+    const token = customToken || auth.getToken();
+    console.log('PaymentIntentsApi.process - Starting request with text:', text);
+    console.log('PaymentIntentsApi.process - Using auth token:', token ? 'Present' : 'Missing');
 
-  //   try {
-  //     const response = await this.client.post('/api/v1/payment-intents/',
-  //       { text },
-  //       { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
-  //     );
-  //     console.log('PaymentIntentsApi.process - Response:', response);
+    try {
+      // Using the correct endpoint /api/v1/process as specified in your working example
+      // Using full URL to match the format in the working example
+      const url = 'http://localhost:8080/api/v1/process';
+      const response = await this.client.post<ProcessedPaymentIntent>(url,
+        { text },
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+      );
+      console.log('PaymentIntentsApi.process - Response:', response);
 
-  //     if (response.status >= 400) {
-  //       throw new Error(response.data.error || 'Failed to process payment intent');
-  //     }
-
-  //     return response;
-  //   } catch (error: any) {
-  //     console.error('PaymentIntentsApi.process - Error:', error);
-  //     if (error.response?.data?.error) {
-  //       throw new Error(error.response.data.error);
-  //     }
-  //     throw error;
-  //   }
-  // }
+      return response;
+    } catch (error: any) {
+      console.error('PaymentIntentsApi.process - Error:', error);
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      }
+      throw error;
+    }
+  }
 }
