@@ -27,11 +27,12 @@ interface ChatMessage extends Message {
 }
 
 const DEMO_COMMANDS = [
-  { command: "send 500k eur to john", description: "Start a new payment" },
+  { command: "send 500 eur to john", description: "Start a new payment" },
   { command: "transfer €1000 to alice", description: "Make a transfer in EUR" },
   { command: "pay $500 to bob", description: "Make a payment in USD" },
-  { command: "show my recent payments", description: "View payment history" },
-  { command: "show payment intents", description: "View all payment intents" }
+  { command: "show me my beneficiaries", description: "View saved recipients" },
+  { command: "show my last 5 transactions", description: "View recent activity" },
+  { command: "buy 100 eur", description: "Exchange currency" }
 ];
 
 export default function ChatPage() {
@@ -44,38 +45,15 @@ export default function ChatPage() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const loadPaymentIntents = async () => {
-      try {
-        const intents = await api.paymentIntents.list();
-        setPaymentIntents(intents);
-        setMessages([
-          {
-            text: "Welcome! I'm here to help you with payments. Here are your current payment intents:",
-            sender: 'system',
-            timestamp: new Date().toISOString(),
-            status: 'completed',
-            action: {
-              type: 'SHOW_PAYMENT_INTENTS',
-              data: {
-                paymentIntents: intents
-              }
-            }
-          }
-        ]);
-      } catch (error) {
-        console.error('Failed to load payment intents:', error);
-        setMessages([
-          {
-            text: "Welcome! I'm here to help you with payments.",
-            sender: 'system',
-            timestamp: new Date().toISOString(),
-            status: 'completed'
-          }
-        ]);
+    // Simple welcome message instead of loading payment intents by default
+    setMessages([
+      {
+        text: "Welcome! I'm your finance assistant. How can I help you today?",
+        sender: 'system',
+        timestamp: new Date().toISOString(),
+        status: 'completed'
       }
-    };
-
-    loadPaymentIntents();
+    ]);
   }, []);
 
   // Handle showing payment intents in chat
@@ -115,8 +93,23 @@ export default function ChatPage() {
     return null;
   };
 
+  // Function to scroll to bottom of chat
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  // Auto-scroll when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
   const processMessage = async (messageText: string) => {
     try {
+      // Don't process empty messages
+      if (!messageText.trim()) return;
+      
       setMessages(prev => [
         ...prev,
         {
@@ -311,9 +304,21 @@ export default function ChatPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
-
-    await processMessage(input);
+    
+    // Store the input and immediately clear it for better UX
+    const messageText = input;
     setInput('');
+    
+    // Set loading state
+    setIsLoading(true);
+    
+    try {
+      await processMessage(messageText);
+    } catch (error) {
+      console.error('Error processing message:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleConfirm = () => {
@@ -361,8 +366,18 @@ export default function ChatPage() {
             </div>
             <div className="space-y-1 text-sm text-blue-600">
               {DEMO_COMMANDS.map(({ command, description }) => (
-                <div key={command}>
-                  <code className="bg-blue-100 px-1 rounded">{command}</code>
+                <div key={command} className="flex items-center">
+                  <code 
+                    className="bg-blue-100 px-2 py-1 rounded cursor-pointer hover:bg-blue-200 transition-colors"
+                    onClick={() => {
+                      setInput(command);
+                      // Focus the input field
+                      const inputElement = document.querySelector('input[type="text"]') as HTMLInputElement;
+                      if (inputElement) inputElement.focus();
+                    }}
+                  >
+                    {command}
+                  </code>
                   <span className="ml-2 text-blue-500">{description}</span>
                 </div>
               ))}
@@ -382,12 +397,19 @@ export default function ChatPage() {
                     : message.sender === 'user'
                       ? 'bg-blue-500 text-white'
                       : 'bg-gray-100 text-gray-900'
-                    } ${!message.isLoading && 'p-4'} rounded-lg max-w-[80%]`}
+                    } ${!message.isLoading && 'p-4'} rounded-lg max-w-[80%] shadow-sm`}
                 >
                   <div className={`break-words ${message.isLoading ? 'text-gray-500' : ''}`}>
                     {message.text}
                     {message.isLoading && <LoadingDots />}
                   </div>
+                  
+                  {!message.isLoading && message.timestamp && (
+                    <div className={`text-xs mt-1 ${message.sender === 'user' ? 'text-blue-200' : 'text-gray-500'}`}>
+                      {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  )}
+                  
                   {message.action && (
                     <MessageAction
                       action={message.action}
@@ -404,22 +426,39 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 shadow-lg">
+      <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 shadow-lg">
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your message..."
-            className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:border-blue-500"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e);
+              }
+            }}
+            placeholder="Ask about payments, transfers, beneficiaries, or transactions..."
+            className="flex-1 rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            disabled={isLoading}
           />
           <button
             type="submit"
-            className="bg-blue-500 text-white rounded-lg p-2 hover:bg-blue-600 focus:outline-none"
+            className={`${
+              isLoading 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : input.trim() 
+                  ? 'bg-blue-500 hover:bg-blue-600' 
+                  : 'bg-blue-400 cursor-not-allowed'
+            } text-white rounded-lg p-3 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+            disabled={isLoading || !input.trim()}
           >
-            <Send size={20} />
+            {isLoading ? <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Send size={20} />}
           </button>
         </form>
+        <div className="mt-2 text-xs text-gray-500">
+          Try: "Send $500 to John", "Show my beneficiaries", or "List recent transactions"
+        </div>
       </div>
 
       <BottomNav />
