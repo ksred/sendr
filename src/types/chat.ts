@@ -22,7 +22,10 @@ export type ActionType =
   | 'CURRENCY_EXCHANGE'   // Buy foreign currency
   | 'SHOW_BENEFICIARIES'  // Show beneficiary list
   | 'SHOW_TRANSACTIONS'   // Show transaction list
-  | 'SHOW_PAYMENT_INTENTS'; // Show payment intents
+  | 'SHOW_PAYMENT_INTENTS' // Show payment intents
+  // Forex specific types
+  | 'SHOW_RATES'          // Show current forex rates
+  | 'SHOW_ORDERS';        // Show active forex orders
 
 // Base action data interface
 export interface ActionData {
@@ -69,6 +72,21 @@ export interface ActionData {
     status: string;
   }>;
   paymentIntents?: any[];
+  // Forex data types
+  rates?: Array<{
+    pair: string;
+    rate: string;
+    change: string;
+  }>;
+  orders?: Array<{
+    id: string;
+    description: string;
+    amount: string;
+    currency: string;
+    status: string;
+    type: string;
+    rate: string;
+  }>;
 }
 
 // Payment initiation specific action
@@ -92,7 +110,7 @@ export interface PaymentConfirmationAction {
 
 // Beneficiary and transaction display action
 export interface DisplayAction {
-  type: 'SHOW_BENEFICIARIES' | 'SHOW_TRANSACTIONS' | 'SHOW_PAYMENT_INTENTS';
+  type: 'SHOW_BENEFICIARIES' | 'SHOW_TRANSACTIONS' | 'SHOW_PAYMENT_INTENTS' | 'SHOW_RATES' | 'SHOW_ORDERS';
   data: ActionData;
   options?: {
     viewDetails?: boolean;

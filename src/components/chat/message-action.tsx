@@ -8,9 +8,9 @@ import { PaymentIntentList } from '@/components/payments/payment-intent-list';
 
 interface MessageActionProps {
   action: any; // More permissive type to avoid TypeScript errors with action structure
-  onConfirm?: () => void;
-  onModify?: () => void;
-  onCancel?: () => void;
+  onConfirm?: (paymentId: string) => void;
+  onModify?: (paymentId: string) => void;
+  onCancel?: (paymentId: string) => void;
 }
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
@@ -43,14 +43,25 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel }:
 
   const handleConfirm = async () => {
     console.log('handleConfirm', action.data.intent);
-    if (!action.data.intent?.payment_id) return;
+    if (!action.data.intent?.payment_id) {
+      console.error('Payment ID is missing, cannot confirm');
+      setErrorMessage('Payment ID is missing, cannot confirm this payment');
+      return;
+    }
 
     setStatus('loading');
     setErrorMessage(null);
     try {
-      await api.paymentIntents.confirm(action.data.intent.payment_id);
+      const response = await api.paymentIntents.confirm(action.data.intent.payment_id);
+      console.log('Payment confirmed successfully:', response);
+      
+      // Update the local state with the confirmed status
+      if (action.data.intent && action.data.intent.details) {
+        action.data.intent.details.status = 'completed';
+      }
+      
       setStatus('success');
-      onConfirm?.();
+      onConfirm?.(action.data.intent.payment_id);
     } catch (error: any) {
       console.error('Failed to confirm payment intent:', error);
       setStatus('error');
@@ -59,23 +70,30 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel }:
   };
 
   const handleReject = async () => {
-    console.log('handleCancel', action.data.intent);
-    if (!action.data.intent?.payment_id) return;
+    console.log('handleReject', action.data.intent);
+    if (!action.data.intent?.payment_id) {
+      console.error('Payment ID is missing, cannot reject');
+      setErrorMessage('Payment ID is missing, cannot reject this payment');
+      return;
+    }
 
     setStatus('loading');
     setErrorMessage(null);
     try {
       const response = await api.paymentIntents.reject(action.data.intent.payment_id);
-      if (action.data.intent) {
-        action.data.intent.status = response.status;
+      console.log('Payment rejected successfully:', response);
+      
+      // Update the local state with the rejected status
+      if (action.data.intent && action.data.intent.details) {
+        action.data.intent.details.status = 'rejected';
       }
-      console.log("Rejected payment intent:", action.data.intent)
+      
       setStatus('success');
-      onCancel?.();
+      onCancel?.(action.data.intent.payment_id);
     } catch (error: any) {
-      console.error('Failed to cancel payment intent:', error);
+      console.error('Failed to reject payment intent:', error);
       setStatus('error');
-      setErrorMessage(error.message || 'Failed to cancel payment. Please try again.');
+      setErrorMessage(error.message || 'Failed to reject payment. Please try again.');
     }
   };
 
@@ -166,46 +184,50 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel }:
             </div>
           </div>
         </div>
-        <div className="flex gap-2 mt-4">
-          <button
-            onClick={handleConfirm}
-            disabled={status === 'loading' || status === 'success'}
-            className={`flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${status === 'error' ? 'opacity-100 hover:bg-green-500' : ''}`}
-          >
-            {status === 'loading' ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Processing...</span>
-              </>
-            ) : status === 'error' ? (
-              'Try Again'
-            ) : (
-              'Confirm'
-            )}
-          </button>
-          {/* <button
-            onClick={onModify}
-            disabled={status === 'loading' || status === 'success'}
-            className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center"
-          >
-            <Edit2 className="w-4 h-4 mr-2" />
-            Modify
-          </button> */}
-          <button
-            onClick={handleReject}
-            disabled={status === 'loading' || status === 'success'}
-            className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
-          >
-            {status === 'loading' ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Processing...</span>
-              </>
-            ) : (
-              'Reject'
-            )}
-          </button>
-        </div>
+        {status !== 'success' && (
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={handleConfirm}
+              disabled={status === 'loading' || status === 'success'}
+              className={`flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${status === 'error' ? 'opacity-100 hover:bg-green-500' : ''}`}
+            >
+              {status === 'loading' ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Processing...</span>
+                </>
+              ) : status === 'error' ? (
+                'Try Again'
+              ) : (
+                'Confirm'
+              )}
+            </button>
+            <button
+              onClick={handleReject}
+              disabled={status === 'loading' || status === 'success'}
+              className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+            >
+              {status === 'loading' ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                'Reject'
+              )}
+            </button>
+          </div>
+        )}
+        {status === 'success' && (
+          <div className="mt-4 p-3 bg-green-100 text-green-800 rounded-lg flex items-center gap-2">
+            <Check className="w-5 h-5" />
+            <span className="font-medium">
+              {intent.details.status === 'rejected' 
+                ? 'Payment rejected successfully' 
+                : 'Payment confirmed successfully'}
+            </span>
+          </div>
+        )}
         {errorMessage && status === 'error' && (
           <div className="mt-3 text-sm text-red-400 bg-red-400/10 p-2 rounded flex items-start gap-2">
             <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -374,21 +396,134 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel }:
             </div>
           </div>
         </div>
-        <div className="flex gap-2 mt-4">
-          <button
-            onClick={handleConfirm}
-            disabled={status === 'loading' || status === 'success'}
-            className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Confirm Exchange
-          </button>
-          <button
-            onClick={handleReject}
-            disabled={status === 'loading' || status === 'success'}
-            className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Cancel
-          </button>
+        {status !== 'success' && (
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={handleConfirm}
+              disabled={status === 'loading' || status === 'success'}
+              className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {status === 'loading' ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                'Confirm Exchange'
+              )}
+            </button>
+            <button
+              onClick={handleReject}
+              disabled={status === 'loading' || status === 'success'}
+              className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {status === 'loading' ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                'Cancel'
+              )}
+            </button>
+          </div>
+        )}
+        {status === 'success' && (
+          <div className="mt-4 p-3 bg-green-100 text-green-800 rounded-lg flex items-center gap-2">
+            <Check className="w-5 h-5" />
+            <span className="font-medium">
+              {action.data.intent?.details?.status === 'rejected' 
+                ? 'Exchange cancelled successfully' 
+                : 'Exchange confirmed successfully'}
+            </span>
+          </div>
+        )}
+        {errorMessage && status === 'error' && (
+          <div className="mt-3 text-sm text-red-400 bg-red-400/10 p-2 rounded flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderRates = () => {
+    const rates = action.data.rates || [];
+    return (
+      <div className="mt-4 space-y-4">
+        <div className="bg-slate-800 text-white p-4 rounded-lg space-y-4 w-full max-w-2xl mx-auto">
+          <h3 className="font-semibold text-lg mb-2">Live Market Rates</h3>
+          {rates.length === 0 ? (
+            <p className="text-gray-400">No rates available.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+              {rates.map((rate, index) => (
+                <div 
+                  key={rate.pair || `rate-${index}`} 
+                  className="bg-slate-700 rounded-lg p-4 hover:bg-slate-600 transition-colors"
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="font-medium text-lg">{rate.pair}</div>
+                    <div className={`text-xs px-2 py-1 rounded-full ${
+                      rate.change.startsWith('+') 
+                        ? 'bg-green-900/50 text-green-400' 
+                        : 'bg-red-900/50 text-red-400'
+                    }`}>
+                      {rate.change}
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-white">
+                    {rate.rate}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderOrders = () => {
+    const orders = action.data.orders || [];
+    return (
+      <div className="mt-4 space-y-4">
+        <div className="bg-slate-800 text-white p-4 rounded-lg space-y-4 w-full max-w-2xl mx-auto">
+          <h3 className="font-semibold text-lg mb-2">Active Forex Orders</h3>
+          {orders.length === 0 ? (
+            <p className="text-gray-400">No active orders.</p>
+          ) : (
+            <div className="grid gap-3 w-full">
+              {orders.map((order, index) => (
+                <div 
+                  key={order.id || `order-${index}`} 
+                  className="bg-slate-700 rounded-lg p-4 hover:bg-slate-600 transition-colors"
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="font-medium text-lg">{order.description}</div>
+                    <div className={`text-xs px-2 py-1 rounded-full ${
+                      order.status === 'COMPLETED' 
+                        ? 'bg-green-900/50 text-green-400'
+                        : order.status === 'FAILED'
+                        ? 'bg-red-900/50 text-red-400'
+                        : 'bg-blue-900/50 text-blue-400'
+                    }`}>
+                      {order.type} {order.status}
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className="text-xl font-bold text-white">
+                      {formatCurrency(parseFloat(order.amount), order.currency)}
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-gray-400">Rate:</span> {order.rate}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -414,6 +549,10 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel }:
       return renderBeneficiaries();
     case 'SHOW_TRANSACTIONS':
       return renderTransactions();
+    case 'SHOW_RATES':
+      return renderRates();
+    case 'SHOW_ORDERS':
+      return renderOrders();
     default:
       return null;
   }

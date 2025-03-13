@@ -6,11 +6,13 @@ import AccountOverview from '@/components/account/account-overview';
 import BottomNav from '@/components/navigation/bottom-nav';
 import MessageAction from '@/components/chat/message-action';
 import LoadingDots from '@/components/ui/loading-dots';
-import { Send, Info, ArrowLeft } from 'lucide-react';
+import { Send, Info, ArrowLeft, TrendingUp, Clock, Wallet, Users } from 'lucide-react';
 import { PaymentOrder, PaymentConfirmation, PaymentIntent } from '@/types/payment';
 import { Message, MessageAction as MessageActionType, ActionType, ActionData } from '@/types/chat';
 import api from '@/lib/api';
 import { ApiClientError } from '@/lib/api/client';
+import MarketChart from '@/components/markets/market-chart';
+import ActiveOrders from '@/components/orders/active-orders';
 
 interface ChatMessage extends Message {
   paymentDetails?: {
@@ -30,9 +32,11 @@ const DEMO_COMMANDS = [
   { command: "send 500 eur to john", description: "Start a new payment" },
   { command: "transfer €1000 to alice", description: "Make a transfer in EUR" },
   { command: "pay $500 to bob", description: "Make a payment in USD" },
-  { command: "show me my beneficiaries", description: "View saved recipients" },
+  { command: "what's the EUR/USD rate?", description: "Check forex rates" },
   { command: "show my last 5 transactions", description: "View recent activity" },
-  { command: "buy 100 eur", description: "Exchange currency" }
+  { command: "buy 100 eur with usd", description: "Exchange currency" },
+  { command: "set market alert when EUR/USD > 1.10", description: "Set rate alert" },
+  { command: "show me my pending orders", description: "View forex orders" }
 ];
 
 export default function ChatPage() {
@@ -84,20 +88,95 @@ export default function ChatPage() {
     }
   };
 
+  const handleShowRates = () => {
+    setMessages(prev => [...prev, {
+      text: "Here are the current forex rates:",
+      sender: 'system',
+      timestamp: new Date().toISOString(),
+      status: 'completed',
+      action: {
+        type: 'SHOW_RATES',
+        data: {
+          rates: [
+            { pair: 'EUR/USD', rate: '1.0940', change: '+0.0012' },
+            { pair: 'GBP/USD', rate: '1.2650', change: '-0.0008' },
+            { pair: 'USD/JPY', rate: '151.40', change: '+0.2300' },
+            { pair: 'AUD/USD', rate: '0.6580', change: '+0.0005' }
+          ]
+        }
+      }
+    }]);
+  };
+  
+  const handleShowOrders = () => {
+    setMessages(prev => [...prev, {
+      text: "Here are your pending orders:",
+      sender: 'system',
+      timestamp: new Date().toISOString(),
+      status: 'completed',
+      action: {
+        type: 'SHOW_ORDERS',
+        data: {
+          orders: [
+            {
+              id: 'ord-123456',
+              description: 'Buy EUR/USD',
+              amount: '10000',
+              currency: 'USD',
+              status: 'PENDING',
+              type: 'LIMIT',
+              rate: '1.0940'
+            },
+            {
+              id: 'ord-123457',
+              description: 'Sell GBP/USD',
+              amount: '5000',
+              currency: 'GBP',
+              status: 'ACTIVE',
+              type: 'STOP',
+              rate: '1.2650'
+            }
+          ]
+        }
+      }
+    }]);
+  };
+
   const findMatchingCommand = (input: string): string | null => {
     const normalizedInput = input.toLowerCase().trim();
+    
+    // Payment intents
     if (normalizedInput === 'show payment intents' || normalizedInput === 'show my payment intents') {
       handleShowPaymentIntents();
       return 'show payment intents';
     }
+    
+    // Forex rates
+    if (normalizedInput.includes('rate') || 
+        (normalizedInput.includes('eur') && normalizedInput.includes('usd')) ||
+        normalizedInput.includes('exchange rate')) {
+      handleShowRates();
+      return 'show rates';
+    }
+    
+    // Forex orders
+    if (normalizedInput.includes('pending order') || 
+        normalizedInput.includes('my order') || 
+        normalizedInput.includes('active order')) {
+      handleShowOrders();
+      return 'show orders';
+    }
+    
     return null;
   };
 
   // Function to scroll to bottom of chat
   const scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    setTimeout(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100); // Small delay to ensure DOM is updated
   };
 
   // Auto-scroll when messages change
@@ -157,9 +236,13 @@ export default function ChatPage() {
         // Handle different intent types from api.md specs
         if (intentType === 'payment') {
           const result = processedIntent.result || {};
+          console.log('Payment intent result:', result);
+          // Extract payment_id from result or from top-level field
+          const paymentId = result.payment_id || processedIntent.payment_id || result.id || '';
+          
           actionData = {
             intent: {
-              payment_id: result.id || '',
+              payment_id: paymentId,
               details: {
                 amount: result.amount || '0',
                 status: 'pending',
@@ -180,10 +263,14 @@ export default function ChatPage() {
           };
         } else if (intentType === 'buy_foreign_currency') {
           const result = processedIntent.result || {};
+          console.log('Currency exchange result:', result);
+          // Extract payment_id from result or from top-level field
+          const paymentId = result.payment_id || processedIntent.payment_id || result.id || '';
+          
           actionType = 'CURRENCY_EXCHANGE';
           actionData = {
             intent: {
-              payment_id: '',
+              payment_id: paymentId,
               details: {
                 amount: result.amount || '0',
                 status: 'pending',
@@ -321,37 +408,110 @@ export default function ChatPage() {
     }
   };
 
-  const handleConfirm = () => {
-    console.log('Payment confirmed');
-    // TODO: Implement payment confirmation
+  const handleConfirm = (paymentId: string) => {
+    console.log('Payment confirmed:', paymentId);
+    
+    // Update the message status in the messages array
+    setMessages(prev => {
+      return prev.map(msg => {
+        if (msg.action?.data?.intent?.payment_id === paymentId) {
+          // Create a deep copy to avoid modifying existing state directly
+          const updatedMsg = { ...msg };
+          
+          if (updatedMsg.action && updatedMsg.action.data && updatedMsg.action.data.intent && updatedMsg.action.data.intent.details) {
+            updatedMsg.action.data.intent.details.status = 'completed';
+          }
+          
+          return updatedMsg;
+        }
+        return msg;
+      });
+    });
+    
+    // Add a confirmation message
+    setMessages(prev => [...prev, {
+      text: "Your payment has been confirmed successfully!",
+      sender: 'system',
+      timestamp: new Date().toISOString(),
+      status: 'completed'
+    }]);
   };
 
-  const handleModify = () => {
-    console.log('Payment modification requested');
-    // TODO: Implement payment modification
+  const handleModify = (paymentId: string) => {
+    console.log('Payment modification requested:', paymentId);
+    // Implement payment modification if needed
   };
 
-  const handleCancel = () => {
-    console.log('Payment cancelled');
-    // TODO: Implement payment cancellation
+  const handleCancel = (paymentId: string) => {
+    console.log('Payment cancelled:', paymentId);
+    
+    // Update the message status in the messages array
+    setMessages(prev => {
+      return prev.map(msg => {
+        if (msg.action?.data?.intent?.payment_id === paymentId) {
+          // Create a deep copy to avoid modifying existing state directly
+          const updatedMsg = { ...msg };
+          
+          if (updatedMsg.action && updatedMsg.action.data && updatedMsg.action.data.intent && updatedMsg.action.data.intent.details) {
+            updatedMsg.action.data.intent.details.status = 'rejected';
+          }
+          
+          return updatedMsg;
+        }
+        return msg;
+      });
+    });
+    
+    // Add a rejection message
+    setMessages(prev => [...prev, {
+      text: "Your payment has been cancelled.",
+      sender: 'system',
+      timestamp: new Date().toISOString(),
+      status: 'completed'
+    }]);
   };
 
+  const [showMarketPanel, setShowMarketPanel] = useState(true);
+  
   return (
     <main className="flex flex-col min-h-screen">
-      <div className="bg-slate-900 text-white px-4 py-2 flex items-center">
-        <button
-          onClick={() => router.push('/')}
-          className="flex items-center gap-2 hover:text-blue-400 transition-colors"
-        >
-          <ArrowLeft size={20} />
-          <span>Back to Dashboard</span>
-        </button>
+      <div className="bg-slate-900 text-white px-4 py-2 flex items-center justify-between">
+        <div className="text-lg font-medium">Sendr</div>
+        <div className="flex space-x-4">
+          <button 
+            onClick={() => setShowMarketPanel(!showMarketPanel)}
+            className="flex items-center gap-1 hover:text-blue-400 transition-colors text-sm"
+          >
+            <TrendingUp size={16} />
+            <span>{showMarketPanel ? 'Hide' : 'Show'} Markets</span>
+          </button>
+        </div>
       </div>
 
       <AccountOverview />
+      
+      {showMarketPanel && (
+        <div className="bg-slate-50 p-4 border-b">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white rounded-lg shadow p-4">
+              <h3 className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-3">
+                <TrendingUp size={16} />
+                <span>Market Rates</span>
+              </h3>
+              <MarketChart />
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <h3 className="text-sm font-medium text-gray-700 flex items-center gap-1 mb-3">
+                <Clock size={16} />
+                <span>Active Orders</span>
+              </h3>
+              <ActiveOrders />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div
-        ref={messagesEndRef}
         className="flex-1 overflow-y-auto"
         style={{
           scrollbarWidth: 'thin',
@@ -359,31 +519,6 @@ export default function ChatPage() {
         }}
       >
         <div className="p-4 space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 sticky top-0 z-10 shadow-sm">
-            <div className="flex items-center gap-2 text-blue-700 font-semibold mb-2">
-              <Info size={16} />
-              <span>Demo Commands:</span>
-            </div>
-            <div className="space-y-1 text-sm text-blue-600">
-              {DEMO_COMMANDS.map(({ command, description }) => (
-                <div key={command} className="flex items-center">
-                  <code 
-                    className="bg-blue-100 px-2 py-1 rounded cursor-pointer hover:bg-blue-200 transition-colors"
-                    onClick={() => {
-                      setInput(command);
-                      // Focus the input field
-                      const inputElement = document.querySelector('input[type="text"]') as HTMLInputElement;
-                      if (inputElement) inputElement.focus();
-                    }}
-                  >
-                    {command}
-                  </code>
-                  <span className="ml-2 text-blue-500">{description}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           <div className="space-y-4 pb-36">
             {messages.map((message, index) => (
               <div
@@ -421,7 +556,7 @@ export default function ChatPage() {
                 </div>
               </div>
             ))}
-            <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} className="h-1" />
           </div>
         </div>
       </div>
@@ -456,8 +591,42 @@ export default function ChatPage() {
             {isLoading ? <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Send size={20} />}
           </button>
         </form>
-        <div className="mt-2 text-xs text-gray-500">
-          Try: "Send $500 to John", "Show my beneficiaries", or "List recent transactions"
+        <div className="mt-2 text-xs text-gray-500 flex flex-wrap gap-2">
+          <span>Try:</span>
+          {DEMO_COMMANDS.slice(0, 5).map(({ command }) => (
+            <span 
+              key={command}
+              className="bg-gray-100 px-1.5 py-0.5 rounded cursor-pointer hover:bg-gray-200 transition-colors"
+              onClick={() => {
+                setInput(command);
+                // Focus the input field
+                const inputElement = document.querySelector('input[type="text"]') as HTMLInputElement;
+                if (inputElement) inputElement.focus();
+              }}
+            >
+              {command}
+            </span>
+          ))}
+          <button 
+            className="text-blue-500 hover:underline"
+            onClick={() => {
+              // Show more suggestions as a system message
+              setMessages(prev => [...prev, {
+                text: "Here are some things you can ask me:",
+                sender: 'system',
+                timestamp: new Date().toISOString(),
+                status: 'completed'
+              }, {
+                text: DEMO_COMMANDS.map(c => `• ${c.command} - ${c.description}`).join('\n'),
+                sender: 'system',
+                timestamp: new Date().toISOString(),
+                status: 'completed'
+              }]);
+              setTimeout(scrollToBottom, 100);
+            }}
+          >
+            More options
+          </button>
         </div>
       </div>
 

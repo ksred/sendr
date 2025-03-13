@@ -46,9 +46,13 @@ export class PaymentIntentsApi {
       throw new Error('Authentication token missing');
     }
     try {
-      const response = await this.client.post<PaymentIntent>(`/api/v1/payment-intents/${id}/confirm`, {}, {
+      console.log('PaymentIntentsApi.confirm - Confirming payment ID:', id);
+      // Use the correct URL format from the specification
+      const url = 'http://localhost:8080/api/v1/process/payment/' + id + '/confirm';
+      const response = await this.client.post<PaymentIntent>(url, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      console.log('PaymentIntentsApi.confirm - Response:', response);
       return response;
     } catch (error: any) {
       console.error('PaymentIntentsApi.confirm - Error:', error);
@@ -65,12 +69,16 @@ export class PaymentIntentsApi {
       throw new Error('Authentication token missing');
     }
     try {
-      const response = await this.client.post<PaymentIntent>(`/api/v1/payment-intents/${id}/reject`, {}, {
+      console.log('PaymentIntentsApi.reject - Rejecting payment ID:', id);
+      // Use the correct URL format from the specification
+      const url = 'http://localhost:8080/api/v1/process/payment/' + id + '/reject';
+      const response = await this.client.post<PaymentIntent>(url, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      console.log('PaymentIntentsApi.reject - Response:', response);
       return response;
     } catch (error: any) {
-      console.error('PaymentIntentsApi.cancel - Error:', error);
+      console.error('PaymentIntentsApi.reject - Error:', error);
       if (error.response?.data?.error) {
         throw new Error(error.response.data.error);
       }
