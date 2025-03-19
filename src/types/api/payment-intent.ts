@@ -25,22 +25,85 @@ export interface PaymentSuggestion {
   reason: string;
 }
 
+// Original ProcessedPaymentIntent type (keeping for backward compatibility)
 export interface ProcessedPaymentIntent {
-  payment_id: string;
+  // Common fields from API response
+  intent_type?: string;
+  confidence?: number;
+  error?: string;
+  result?: any;
+  
+  // Legacy fields
+  payment_id?: string;
+  amount?: string;
+  bank_info?: string;
+  beneficiary?: ProcessedBeneficiary;
+  beneficiary_name?: string;
+  converted_amount?: string;
+  currency?: string;
+  exchange_rate?: string;
+  fees?: string;
+  from_currency?: string;
+  purpose?: string;
+  suggestions?: PaymentSuggestion[];
+  to_currency?: string;
+  total_cost?: string;
+}
+
+// New interfaces based on api.md
+export interface ApiIntentResponse {
+  intent_type: string;
+  confidence: number;
+  result: any;
+}
+
+export interface PaymentIntentResult {
   amount: string;
-  bank_info: string;
-  beneficiary: ProcessedBeneficiary;
-  beneficiary_name: string;
-  confidence: PaymentConfidence;
-  converted_amount: string;
   currency: string;
+  beneficiary_name: string;
+  purpose?: string;
   exchange_rate: string;
-  fees: string;
+  fee: string;
+  confidence: {
+    amount: number;
+    currency: number;
+    beneficiary: number;
+  };
+}
+
+export interface BuyForeignCurrencyResult {
+  amount: string;
   from_currency: string;
-  purpose: string;
-  suggestions: PaymentSuggestion[];
   to_currency: string;
+  rate: string;
+  converted_amount: string;
+  fee: string;
   total_cost: string;
+  confidence: {
+    amount: number;
+    from_currency: number;
+    to_currency: number;
+  };
+}
+
+export interface ShowBeneficiaryResult {
+  beneficiary: {
+    id: number;
+    name: string;
+    bank_info: string;
+    currency: string;
+  };
+  confidence: number;
+}
+
+export interface TransactionResult {
+  id: string;
+  date: string;
+  amount: string;
+  currency: string;
+  beneficiary: string;
+  type: string;
+  status: string;
 }
 
 export interface PaymentIntentError {

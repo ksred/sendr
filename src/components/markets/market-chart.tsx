@@ -46,11 +46,14 @@ const generateMockData = (days: number): PricePoint[] => {
 };
 
 interface MarketChartProps {
-  symbol: string;
-  currency: string;
+  symbol?: string;
+  currency?: string;
 }
 
-export default function MarketChart({ symbol, currency }: MarketChartProps) {
+export default function MarketChart({ 
+  symbol = 'EUR/USD', 
+  currency = 'USD' 
+}: MarketChartProps) {
   const [timeframe, setTimeframe] = useState<'1D' | '1W' | '1M'>('1W');
   const [chartData, setChartData] = useState<PricePoint[]>([]);
 
