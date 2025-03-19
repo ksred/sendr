@@ -18,11 +18,13 @@ export type ActionType =
   | 'BENEFICIARY_VALIDATION' // Validate beneficiary details
   | 'RISK_ASSESSMENT'     // Assess payment risk
   | 'CANCELLATION'        // Cancel payment
+  | 'MULTIPLE_BENEFICIARIES' // Multiple beneficiaries found
   // New intent types from API
   | 'CURRENCY_EXCHANGE'   // Buy foreign currency
   | 'SHOW_BENEFICIARIES'  // Show beneficiary list
   | 'SHOW_TRANSACTIONS'   // Show transaction list
   | 'SHOW_PAYMENT_INTENTS' // Show payment intents
+  | 'UNKNOWN'            // Unknown intent type
   // Forex specific types
   | 'SHOW_RATES'          // Show current forex rates
   | 'SHOW_ORDERS';        // Show active forex orders
@@ -55,6 +57,21 @@ export interface ActionData {
   fees?: FeeStructure;
   progress?: number;
   error?: string;
+  // Field for raw message with newlines (used for 'unknown' intent type)
+  rawMessage?: string;
+  // Fields for multiple beneficiaries scenario
+  multipleBeneficiaries?: {
+    message: string;
+    amount: string;
+    currency: string;
+    originalRequest: string;
+    beneficiaries: Array<{
+      id: number;
+      name: string;
+      bankInfo: string;
+      confidence: number;
+    }>;
+  };
   // New data types for the API response formats
   beneficiaries?: Array<{
     id: number;

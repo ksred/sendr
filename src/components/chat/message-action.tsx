@@ -11,11 +11,12 @@ interface MessageActionProps {
   onConfirm?: (paymentId: string) => void;
   onModify?: (paymentId: string) => void;
   onCancel?: (paymentId: string) => void;
+  onProcessMessage?: (message: string) => void; // Function to process new messages
 }
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
 
-export default function MessageAction({ action, onConfirm, onModify, onCancel }: MessageActionProps) {
+export default function MessageAction({ action, onConfirm, onModify, onCancel, onProcessMessage }: MessageActionProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<Status>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -529,6 +530,46 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel }:
     );
   };
 
+  const renderMultipleBeneficiaries = () => {
+    if (!action.data.multipleBeneficiaries) return null;
+    
+    const { amount, currency, beneficiaries } = action.data.multipleBeneficiaries;
+    
+    return (
+      <div className="space-y-3 mt-3">
+        {beneficiaries.map((beneficiary) => (
+          <button
+            key={beneficiary.id}
+            className="w-full bg-white border border-gray-300 shadow-sm rounded-lg p-3 text-left hover:bg-blue-50 hover:border-blue-300 transition-colors"
+            onClick={() => {
+              // Create a formatted payment command with the selected beneficiary
+              const paymentCommand = `pay ${beneficiary.name} ${amount} ${currency}`;
+              
+              // Submit the payment command via the parent component's handler
+              if (onProcessMessage) {
+                onProcessMessage(paymentCommand);
+              } else {
+                // Fallback if onProcessMessage is not provided
+                console.error('No message processor provided for beneficiary selection');
+                alert(`Please type: ${paymentCommand}`);
+              }
+            }}
+          >
+            <div className="flex justify-between items-center">
+              <div>
+                <div className="font-medium text-gray-900">{beneficiary.name}</div>
+                <div className="text-sm text-gray-500">{beneficiary.bankInfo}</div>
+              </div>
+              <div className="text-blue-600 font-medium">
+                {amount} {currency}
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   switch (action.type) {
     case 'PAYMENT_INITIATION':
     case 'ENTITY_EXTRACTION':
@@ -539,6 +580,94 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel }:
     case 'COMPLETED':
     case 'FAILED':
       return renderProgress();
+    case 'MULTIPLE_BENEFICIARIES':
+      return renderMultipleBeneficiaries();
+    case 'UNKNOWN':
+      // For unknown intent, render the formatted message with proper HTML
+      if (!action.data.rawMessage) return null;
+      
+      // Extract example queries that are in quotes for making them clickable
+      const extractQuotedText = (line) => {
+        const matches = line.match(/"([^"]+)"/);
+        return matches ? matches[1] : null;
+      };
+      
+      return (
+        <div className="mt-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
+          {/* Split by newlines and create paragraphs for each line */}
+          {action.data.rawMessage.split('\n').map((line, index) => {
+            const quotedExample = extractQuotedText(line);
+            
+            return (
+              <p key={index} className={line.trim() === '' ? 'h-4' : 'mb-2'}>
+                {/* Handle bullet points with clickable examples */}
+                {line.trim().startsWith('•') || line.trim().startsWith('-') ? (
+                  <span className="flex">
+                    <span className="text-blue-500 mr-2">
+                      {line.trim().startsWith('•') ? '•' : '-'}
+                    </span>
+                    <span>
+                      {quotedExample ? (
+                        <>
+                          {line.substring(0, line.indexOf('"'))}
+                          <span 
+                            className="text-blue-500 cursor-pointer hover:underline"
+                            onClick={() => {
+                              // Find the input field and set its value
+                              const input = document.querySelector('input[type="text"]');
+                              if (input) {
+                                // Set the input value
+                                input.value = quotedExample;
+                                // Dispatch an input event to trigger React's onChange
+                                const event = new Event('input', { bubbles: true });
+                                input.dispatchEvent(event);
+                                // Focus the input
+                                input.focus();
+                              }
+                            }}
+                          >
+                            "{quotedExample}"
+                          </span>
+                          {line.substring(line.indexOf('"') + quotedExample.length + 2)}
+                        </>
+                      ) : (
+                        line.trim().substring(1).trim()
+                      )}
+                    </span>
+                  </span>
+                ) : quotedExample ? (
+                  // Handle lines with quotes but no bullet points
+                  <>
+                    {line.substring(0, line.indexOf('"'))}
+                    <span 
+                      className="text-blue-500 cursor-pointer hover:underline"
+                      onClick={() => {
+                        // Find the input field and set its value
+                        const input = document.querySelector('input[type="text"]');
+                        if (input) {
+                          // Set the input value
+                          input.value = quotedExample;
+                          // Dispatch an input event to trigger React's onChange
+                          const event = new Event('input', { bubbles: true });
+                          input.dispatchEvent(event);
+                          // Focus the input
+                          input.focus();
+                        }
+                      }}
+                    >
+                      "{quotedExample}"
+                    </span>
+                    {line.substring(line.indexOf('"') + quotedExample.length + 2)}
+                  </>
+                ) : (
+                  // Regular line
+                  line
+                )}
+              </p>
+            );
+          })}
+        </div>
+      );
     case 'SHOW_PAYMENT_INTENTS':
       return (
         <div className="w-full max-w-2xl mx-auto">

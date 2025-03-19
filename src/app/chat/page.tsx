@@ -43,6 +43,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isFirstMessageLoading, setIsFirstMessageLoading] = useState(false);
   const [paymentIntents, setPaymentIntents] = useState<PaymentIntent[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -200,22 +201,26 @@ export default function ChatPage() {
       // Don't process empty messages
       if (!messageText.trim()) return;
       
-      setMessages(prev => [
-        ...prev,
-        {
-          text: messageText,
-          sender: 'user',
-          timestamp: new Date().toISOString(),
-          status: 'completed'
-        },
-        {
-          text: '',
-          sender: 'system',
-          timestamp: new Date().toISOString(),
-          status: 'loading',
-          isLoading: true
-        }
-      ]);
+      // Check if the user has sent a message before (are we using the bottom input?)
+      // Only add messages to the UI if we're using the bottom input
+      if (hasUserSentMessage) {
+        setMessages(prev => [
+          ...prev,
+          {
+            text: messageText,
+            sender: 'user',
+            timestamp: new Date().toISOString(),
+            status: 'completed'
+          },
+          {
+            text: '',
+            sender: 'system',
+            timestamp: new Date().toISOString(),
+            status: 'loading',
+            isLoading: true
+          }
+        ]);
+      }
 
       // Use the process endpoint instead of create
       const processedIntent = await api.paymentIntents.process(messageText);
@@ -223,6 +228,27 @@ export default function ChatPage() {
 
       if (processedIntent.error) {
         setMessages(prev => {
+          // If this is the first message, we need to include the user's message
+          // as it may not have been added above
+          if (!hasUserSentMessage) {
+            return [
+              ...prev,
+              {
+                text: messageText,
+                sender: 'user',
+                timestamp: new Date().toISOString(),
+                status: 'completed'
+              },
+              {
+                text: `Sorry, I couldn't process your request: ${processedIntent.error}`,
+                sender: 'system',
+                timestamp: new Date().toISOString(),
+                status: 'error'
+              }
+            ];
+          }
+          
+          // Otherwise, just filter out the loading message and add the error
           const withoutLoading = prev.filter(msg => !msg.isLoading);
           return [...withoutLoading, {
             text: `Sorry, I couldn't process your request: ${processedIntent.error}`,
@@ -235,7 +261,6 @@ export default function ChatPage() {
       }
 
       setMessages(prev => {
-        const withoutLoading = prev.filter(msg => !msg.isLoading);
         console.log('Chat processMessage - Creating response message with intent:', processedIntent);
 
         // Handle different intent types based on the API response
@@ -243,9 +268,60 @@ export default function ChatPage() {
         let responseText = "Here's what I found based on your request:";
         let actionType: ActionType = 'PAYMENT_INITIATION';
         let actionData: ActionData = { intent: {} };
+        
+        // If this is the first message, we need to add the user's message
+        // as it won't have been added above
+        const messages = hasUserSentMessage
+          ? prev.filter(msg => !msg.isLoading) // Just filter out loading messages
+          : [
+              // Include the first user message if it wasn't already added
+              {
+                text: messageText,
+                sender: 'user',
+                timestamp: new Date().toISOString(),
+                status: 'completed'
+              }
+            ];
 
         // Handle different intent types from api.md specs
-        if (intentType === 'payment') {
+        if (intentType === 'unknown') {
+          // For unknown intent, we'll show a simple greeting in the chat bubble
+          // and display the detailed formatted message in the action component
+          const rawMessage = processedIntent.result?.message || "I'm not sure how to help with that. Could you try rephrasing your request?";
+          // Show a simpler message in the chat bubble
+          responseText = "I'm your financial assistant. How can I help you today?";
+          // Use the new UNKNOWN action type
+          actionType = 'UNKNOWN';
+          // Pass the raw message with newlines in the actionData for the component to format
+          actionData = {
+            rawMessage: rawMessage
+          };
+        } else if (intentType === 'payment' && processedIntent.requires_clarification && processedIntent.result.type === 'multiple_beneficiaries') {
+          // Handle the multiple beneficiaries case
+          console.log('Multiple beneficiaries scenario:', processedIntent.result);
+          
+          // Display the message from the API in the chat bubble
+          responseText = processedIntent.result.message || "We found multiple beneficiaries. Please select one:";
+          actionType = 'MULTIPLE_BENEFICIARIES';
+          
+          // Extract beneficiaries from the response
+          const beneficiaries = processedIntent.result.beneficiaries?.map(b => ({
+            id: b.Beneficiary.id,
+            name: b.Beneficiary.name,
+            bankInfo: b.Beneficiary.bank_info,
+            confidence: b.confidence
+          })) || [];
+          
+          actionData = {
+            multipleBeneficiaries: {
+              message: processedIntent.result.message,
+              amount: processedIntent.result.amount,
+              currency: processedIntent.result.currency,
+              originalRequest: processedIntent.result.original_request,
+              beneficiaries: beneficiaries
+            }
+          };
+        } else if (intentType === 'payment') {
           const result = processedIntent.result || {};
           console.log('Payment intent result:', result);
           // Extract payment_id from result or from top-level field
@@ -375,14 +451,29 @@ export default function ChatPage() {
           }
         };
         console.log('Chat processMessage - Created response message:', response);
-        return [...withoutLoading, response];
+        
+        // Return the appropriate message array
+        return [...messages, response];
       });
     } catch (error: any) {
       console.error('Chat processMessage - Error:', error);
       setMessages(prev => {
-        const withoutLoading = prev.filter(msg => !msg.isLoading);
+        // If this is the first message, we need to include the user's message
+        // as it may not have been added earlier
+        const messages = hasUserSentMessage
+          ? prev.filter(msg => !msg.isLoading) // Just filter out loading messages
+          : [
+              // Include the first user message if it wasn't already added
+              {
+                text: messageText,
+                sender: 'user',
+                timestamp: new Date().toISOString(),
+                status: 'completed'
+              }
+            ];
+        
         const errorMessage = error.response?.data?.error || error.message || 'An unknown error occurred';
-        return [...withoutLoading, {
+        return [...messages, {
           text: `Sorry, I couldn't process your payment request: ${errorMessage}`,
           sender: 'system',
           timestamp: new Date().toISOString(),
@@ -415,20 +506,33 @@ export default function ChatPage() {
     // Set loading state
     setIsLoading(true);
     
-    // Mark that user has sent at least one message
-    setHasUserSentMessage(true);
+    // Switch to bottom input IMMEDIATELY when the user submits their first message
+    // This happens before any processing to avoid UX issues
+    if (showCenteredInput) {
+      switchToBottomInput();
+      // Set the first message loading state to show a loading indicator
+      setIsFirstMessageLoading(true);
+      // Don't set hasUserSentMessage yet - we'll do that when we get a response
+      // This prevents messages from being displayed until we receive a response
+    } else {
+      // If we're already using the bottom input, mark that the user has sent a message
+      // so that existing messages continue to be displayed
+      setHasUserSentMessage(true);
+    }
     
     try {
       await processMessage(messageText);
       
-      // Always switch to bottom input after the first message is processed
-      if (showCenteredInput) {
-        switchToBottomInput();
-      }
+      // Now that we have a response, we can safely mark that the user has sent a message
+      // This will make messages visible in the UI
+      setHasUserSentMessage(true);
     } catch (error) {
       console.error('Error processing message:', error);
+      // Even in case of error, mark that user has sent a message so we show something
+      setHasUserSentMessage(true);
     } finally {
       setIsLoading(false);
+      setIsFirstMessageLoading(false);
     }
   };
 
@@ -585,6 +689,7 @@ export default function ChatPage() {
                         onConfirm={handleConfirm}
                         onModify={handleModify}
                         onCancel={handleCancel}
+                        onProcessMessage={processMessage}
                       />
                     )}
                   </div>
@@ -670,6 +775,18 @@ export default function ChatPage() {
           </div>
         )}
       </div>
+
+      {/* Loading indicator for first message */}
+      {isFirstMessageLoading && !hasUserSentMessage && !showCenteredInput && (
+        <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg">
+          <div className="flex items-center justify-center space-x-2">
+            <div className="w-2 h-2 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0s' }}></div>
+            <div className="w-2 h-2 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            <div className="w-2 h-2 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+            <span className="text-sm text-gray-500 ml-2">Processing your message...</span>
+          </div>
+        </div>
+      )}
 
       {/* Bottom input - only shown after user has sent a message and centered input is hidden */}
       {hasUserSentMessage && !showCenteredInput && (

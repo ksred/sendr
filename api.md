@@ -10,15 +10,32 @@ All responses from the `/api/v1/process` endpoint follow this general structure:
 {
   "intent_type": "the_intent_type",
   "confidence": 0.0-1.0,
+  "requires_clarification": false, // Optional, true if user input needs clarification
   "result": {} // Intent-specific result object
 }
 ```
 
 - `intent_type`: The classified intent type (string)
 - `confidence`: The confidence score of the intent classification (float between 0.0 and 1.0)
+- `requires_clarification`: Optional boolean flag indicating if user input needs clarification (e.g., multiple beneficiaries)
 - `result`: The intent-specific result object (structure varies by intent type)
 
 ## Intent-Specific Response Formats
+
+### Unknown Intent
+
+**Intent Type:** `unknown`
+
+**Example:**
+```json
+{
+  "confidence": 0.99,
+  "intent_type": "unknown",
+  "result": {
+    "message": "Hello! \n\nI'd be happy to help with your banking needs. I can assist with:\n• Making payments to your contacts\n• Viewing your recent transactions  \n• Managing your beneficiaries\n• Scheduling future payments\n• Buying foreign currency\n\nFor example, you could try:\n\"Show me my recent transactions\"\n\"I need to pay John $50\"\n\"How do I add a new beneficiary?\"\n\nWhat would you like help with today?"
+  }
+}
+```
 
 ### Payment Intent
 
@@ -41,6 +58,47 @@ All responses from the `/api/v1/process` endpoint follow this general structure:
       "currency": 0.95,
       "beneficiary": 0.92
     }
+  }
+}
+```
+
+### Payment with Multiple Beneficiaries
+
+**Intent Type:** `payment` (with `requires_clarification: true`)
+
+**Example:**
+```json
+{
+  "confidence": 0.95,
+  "intent_type": "payment",
+  "requires_clarification": true,
+  "result": {
+    "amount": "500",
+    "beneficiaries": [
+      {
+        "Beneficiary": {
+          "id": 6,
+          "name": "Jacob John",
+          "bank_info": "Barclays - 50090909",
+          "currency": ""
+        },
+        "confidence": 0.8
+      },
+      {
+        "Beneficiary": {
+          "id": 5,
+          "name": "Jacob Johnny",
+          "bank_info": "Barclays - 600044",
+          "currency": ""
+        },
+        "confidence": 0.75
+      }
+    ],
+    "currency": "EUR",
+    "message": "We found multiple beneficiaries matching 'John'. Which of the following would you like to transfer to?",
+    "options": "[Jacob John], [Jacob Johnny]",
+    "original_request": "pay john 500 eur",
+    "type": "multiple_beneficiaries"
   }
 }
 ```

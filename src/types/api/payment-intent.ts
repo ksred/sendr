@@ -54,21 +54,36 @@ export interface ProcessedPaymentIntent {
 export interface ApiIntentResponse {
   intent_type: string;
   confidence: number;
+  requires_clarification?: boolean;
   result: any;
 }
 
 export interface PaymentIntentResult {
   amount: string;
   currency: string;
-  beneficiary_name: string;
+  beneficiary_name?: string;
   purpose?: string;
-  exchange_rate: string;
-  fee: string;
-  confidence: {
+  exchange_rate?: string;
+  fee?: string;
+  confidence?: {
     amount: number;
     currency: number;
     beneficiary: number;
   };
+  // Fields for multiple beneficiaries scenario
+  beneficiaries?: Array<{
+    Beneficiary: {
+      id: number;
+      name: string;
+      bank_info: string;
+      currency: string;
+    };
+    confidence: number;
+  }>;
+  message?: string;
+  options?: string;
+  original_request?: string;
+  type?: string;
 }
 
 export interface BuyForeignCurrencyResult {
