@@ -39,10 +39,14 @@ export default function LoginPage() {
       auth.setToken(data.data.token);
       auth.setUser(data.data.user);
 
-      // Ensure the token is stored before redirecting
-      await new Promise(resolve => setTimeout(resolve, 100));
+      console.log('Login successful, redirecting to chat...');
+      
+      // Ensure the token and cookie are stored before redirecting
+      // Use a longer timeout to ensure the cookie is properly set
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Use replace instead of push to prevent back navigation to login
+      console.log('Redirecting now...');
       router.replace('/chat');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');

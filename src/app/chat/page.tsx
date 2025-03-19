@@ -49,7 +49,11 @@ export default function ChatPage() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    // Simple welcome message instead of loading payment intents by default
+    // Check if there are any URL parameters that might indicate we should switch to bottom input
+    const hasSearchParam = window.location.search.length > 1;
+    
+    // Add empty welcome message for state management, but don't display it
+    // until the user sends their first message
     setMessages([
       {
         text: "Welcome! I'm your finance assistant. How can I help you today?",
@@ -58,6 +62,13 @@ export default function ChatPage() {
         status: 'completed'
       }
     ]);
+    
+    // If there are URL parameters, mark user as having sent a message
+    // and switch to bottom input
+    if (hasSearchParam) {
+      setHasUserSentMessage(true);
+      setShowCenteredInput(false);
+    }
   }, []);
 
   // Handle showing payment intents in chat
@@ -384,6 +395,11 @@ export default function ChatPage() {
   useEffect(() => {
     const initialMessage = searchParams.get('message');
     if (initialMessage) {
+      // If there's an initial message from URL, mark that the user has sent a message
+      setHasUserSentMessage(true);
+      // Also hide the centered input right away
+      setShowCenteredInput(false);
+      // Process the message
       processMessage(initialMessage);
     }
   }, [searchParams]);
@@ -399,8 +415,16 @@ export default function ChatPage() {
     // Set loading state
     setIsLoading(true);
     
+    // Mark that user has sent at least one message
+    setHasUserSentMessage(true);
+    
     try {
       await processMessage(messageText);
+      
+      // Always switch to bottom input after the first message is processed
+      if (showCenteredInput) {
+        switchToBottomInput();
+      }
     } catch (error) {
       console.error('Error processing message:', error);
     } finally {
@@ -471,7 +495,15 @@ export default function ChatPage() {
     }]);
   };
 
-  const [showMarketPanel, setShowMarketPanel] = useState(true);
+  const [showMarketPanel, setShowMarketPanel] = useState(false); // Hide market panel by default
+  const [showCenteredInput, setShowCenteredInput] = useState(true);
+  const [hasUserSentMessage, setHasUserSentMessage] = useState(false);
+  
+  // Function to switch from centered to bottom input
+  const switchToBottomInput = () => {
+    // Always hide the centered input when this is called
+    setShowCenteredInput(false);
+  };
   
   return (
     <main className="flex flex-col min-h-screen">
@@ -518,61 +550,146 @@ export default function ChatPage() {
           scrollbarColor: '#CBD5E1 #F1F5F9'
         }}
       >
-        <div className="p-4 space-y-4">
-          <div className="space-y-4 pb-36">
-            {messages.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'
-                  }`}
-              >
+        {/* Only show messages if user has sent at least one message */}
+        {hasUserSentMessage && (
+          <div className="p-4 space-y-4">
+            <div className="space-y-4 pb-36">
+              {messages.map((message, index) => (
                 <div
-                  className={`${message.isLoading
-                    ? 'bg-transparent p-2'
-                    : message.sender === 'user'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-900'
-                    } ${!message.isLoading && 'p-4'} rounded-lg max-w-[80%] shadow-sm`}
+                  key={index}
+                  className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'
+                    }`}
                 >
-                  <div className={`break-words ${message.isLoading ? 'text-gray-500' : ''}`}>
-                    {message.text}
-                    {message.isLoading && <LoadingDots />}
-                  </div>
-                  
-                  {!message.isLoading && message.timestamp && (
-                    <div className={`text-xs mt-1 ${message.sender === 'user' ? 'text-blue-200' : 'text-gray-500'}`}>
-                      {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  <div
+                    className={`${message.isLoading
+                      ? 'bg-transparent p-2'
+                      : message.sender === 'user'
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 text-gray-900'
+                      } ${!message.isLoading && 'p-4'} rounded-lg max-w-[80%] shadow-sm`}
+                  >
+                    <div className={`break-words ${message.isLoading ? 'text-gray-500' : ''}`}>
+                      {message.text}
+                      {message.isLoading && <LoadingDots />}
                     </div>
-                  )}
-                  
-                  {message.action && (
-                    <MessageAction
-                      action={message.action}
-                      onConfirm={handleConfirm}
-                      onModify={handleModify}
-                      onCancel={handleCancel}
-                    />
-                  )}
+                    
+                    {!message.isLoading && message.timestamp && (
+                      <div className={`text-xs mt-1 ${message.sender === 'user' ? 'text-blue-200' : 'text-gray-500'}`}>
+                        {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    )}
+                    
+                    {message.action && (
+                      <MessageAction
+                        action={message.action}
+                        onConfirm={handleConfirm}
+                        onModify={handleModify}
+                        onCancel={handleCancel}
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-            <div ref={messagesEndRef} className="h-1" />
+              ))}
+              <div ref={messagesEndRef} className="h-1" />
+            </div>
           </div>
-        </div>
+        )}
+        
+        {/* Centered input - always shown until user sends a message */}
+        {showCenteredInput && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-full max-w-2xl px-4 pointer-events-auto">
+              <form onSubmit={(e) => {
+                handleSubmit(e);
+                // Don't call switchToBottomInput() here - we'll let the submit handler control this
+              }} className="flex flex-col items-center gap-6">
+                <div className="text-center mb-2">
+                  <h2 className="text-2xl font-semibold text-gray-800 mb-2">How can I help with your finances?</h2>
+                  <p className="text-gray-500">Ask about payments, transfers, exchange rates, or market orders</p>
+                </div>
+                
+                <div className="flex w-full items-center gap-2 shadow-lg rounded-lg border border-gray-200 bg-white p-1">
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => {
+                      setInput(e.target.value);
+                      // Don't switch to bottom on change
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSubmit(e);
+                        // Don't switch to bottom input here
+                      }
+                    }}
+                    onFocus={() => {
+                      // Don't switch to bottom on focus
+                    }}
+                    placeholder="Ask about payments, transfers, beneficiaries, or transactions..."
+                    className="flex-1 rounded-lg border-0 px-4 py-3 focus:outline-none focus:ring-0"
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="submit"
+                    className={`${
+                      isLoading 
+                        ? 'bg-gray-400 cursor-not-allowed' 
+                        : input.trim() 
+                          ? 'bg-blue-500 hover:bg-blue-600' 
+                          : 'bg-blue-400 cursor-not-allowed'
+                    } text-white rounded-lg p-3 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+                    disabled={isLoading || !input.trim()}
+                  >
+                    {isLoading ? 
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : 
+                      <Send size={20} />
+                    }
+                  </button>
+                </div>
+                
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {DEMO_COMMANDS.slice(0, 5).map(({ command }) => (
+                    <span 
+                      key={command}
+                      className="bg-gray-100 px-2.5 py-1.5 rounded-full cursor-pointer hover:bg-gray-200 transition-colors"
+                      onClick={() => {
+                        setInput(command);
+                        // No switching to bottom input
+                        // Focus the input field
+                        const inputElement = document.querySelector('input[type="text"]') as HTMLInputElement;
+                        if (inputElement) inputElement.focus();
+                      }}
+                    >
+                      {command}
+                    </span>
+                  ))}
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 shadow-lg">
+      {/* Bottom input - only shown after user has sent a message and centered input is hidden */}
+      {hasUserSentMessage && !showCenteredInput && (
+        <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 shadow-lg">
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <input
             type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              switchToBottomInput();
+            }}
             onKeyDown={(e) => {
+              switchToBottomInput();
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleSubmit(e);
               }
             }}
+            onFocus={() => switchToBottomInput()}
             placeholder="Ask about payments, transfers, beneficiaries, or transactions..."
             className="flex-1 rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             disabled={isLoading}
@@ -599,6 +716,7 @@ export default function ChatPage() {
               className="bg-gray-100 px-1.5 py-0.5 rounded cursor-pointer hover:bg-gray-200 transition-colors"
               onClick={() => {
                 setInput(command);
+                switchToBottomInput();
                 // Focus the input field
                 const inputElement = document.querySelector('input[type="text"]') as HTMLInputElement;
                 if (inputElement) inputElement.focus();
@@ -622,6 +740,7 @@ export default function ChatPage() {
                 timestamp: new Date().toISOString(),
                 status: 'completed'
               }]);
+              switchToBottomInput();
               setTimeout(scrollToBottom, 100);
             }}
           >
@@ -629,6 +748,7 @@ export default function ChatPage() {
           </button>
         </div>
       </div>
+      )}
 
       <BottomNav />
     </main>
