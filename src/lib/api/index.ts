@@ -3,12 +3,14 @@ import { BeneficiariesApi } from './endpoints/beneficiaries';
 import { PaymentsApi } from './endpoints/payments';
 import { ExchangeApi } from './endpoints/exchange';
 import { PaymentIntentsApi } from './endpoints/payment-intents';
+import { AccountsApi } from './endpoints/accounts';
 
 export class Api {
   public beneficiaries: BeneficiariesApi;
   public payments: PaymentsApi;
   public exchange: ExchangeApi;
   public paymentIntents: PaymentIntentsApi;
+  public accounts: AccountsApi;
 
   private client: ApiClient;
 
@@ -20,6 +22,7 @@ export class Api {
     this.payments = new PaymentsApi(this.client);
     this.exchange = new ExchangeApi(this.client);
     this.paymentIntents = new PaymentIntentsApi(this.client);
+    this.accounts = new AccountsApi(this.client);
   }
   
   setAuthToken(token: string) {

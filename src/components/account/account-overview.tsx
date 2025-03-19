@@ -1,22 +1,43 @@
 'use client';
 
-import { ChevronRight, AlertCircle } from 'lucide-react';
+import { ChevronRight, AlertCircle, Loader2 } from 'lucide-react';
 import { Position } from '@/types/trading';
 import { formatCurrency } from '@/lib/utils/format';
 import { useAccount } from '@/contexts/account-context';
 
 export default function AccountOverview() {
-  const { positions, isLoading, balance } = useAccount();
+  const { positions, isLoading, error, defaultAccount, getAccountBalance, getAccountCurrency } = useAccount();
+  
+  // Format the account balance with the correct currency
+  const formattedBalance = () => {
+    const balance = getAccountBalance();
+    const currency = getAccountCurrency();
+    return formatCurrency(parseFloat(balance), currency);
+  };
 
   return (
     <div className="bg-slate-900 text-white px-4 py-6 space-y-4">
       {/* Main Balance */}
       <div className="flex justify-between items-start">
         <div className="space-y-1">
-          <p className="text-sm text-slate-400">Available for Trading</p>
-          <p className="text-2xl font-bold tracking-tight">
-            {isLoading ? '...' : formatCurrency(balance)}
+          <p className="text-sm text-slate-400">
+            {defaultAccount ? `${defaultAccount.name}` : 'Available Balance'}
           </p>
+          <div className="text-2xl font-bold tracking-tight">
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                <span className="text-slate-400">Loading...</span>
+              </div>
+            ) : error ? (
+              <div className="flex items-center gap-2 text-red-400 text-sm">
+                <AlertCircle size={16} />
+                <span>Error loading account</span>
+              </div>
+            ) : (
+              formattedBalance()
+            )}
+          </div>
         </div>
         <button className="flex items-center gap-1 bg-slate-800 px-3 py-1.5 rounded-lg text-sm hover:bg-slate-700 transition-colors">
           <AlertCircle size={16} className="text-slate-400" />

@@ -44,3 +44,16 @@ export interface AccountContext {
   utilizationRate: number;
   status: 'ACTIVE' | 'RESTRICTED' | 'SUSPENDED';
 }
+
+export interface Account {
+  id: number;
+  account_id: string;
+  user_id: number;
+  name: string;
+  type: string;
+  balance: string;
+  currency: string;
+  is_active: boolean;
+  description: string;
+  is_default: boolean;
+}
