@@ -16,6 +16,7 @@ interface AccountContextType {
   currentPayment: PaymentOrder | null;
   paymentHistory: PaymentConfirmation[];
   exchangeRates: Record<string, number>;
+  refreshAccounts: () => Promise<void>;
 }
 
 const AccountContext = createContext<AccountContextType | undefined>(undefined);
@@ -40,47 +41,51 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     return defaultAccount?.currency || 'USD';
   };
 
-  useEffect(() => {
-    const loadAccounts = async () => {
-      // Don't fetch accounts on authentication pages
-      if (typeof window !== 'undefined') {
-        const pathname = window.location.pathname;
-        // Skip account loading for authentication pages
-        if (pathname === '/login' || pathname === '/register' || pathname === '/forgot-password') {
-          setIsLoading(false);
-          return;
-        }
+  // Function to load accounts that can be called from outside the useEffect
+  const loadAccounts = async () => {
+    // Don't fetch accounts on authentication pages
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname;
+      // Skip account loading for authentication pages
+      if (pathname === '/login' || pathname === '/register' || pathname === '/forgot-password') {
+        setIsLoading(false);
+        return;
       }
-      
-      setIsLoading(true);
-      try {
-        const data = await api.accounts.list();
-        setAccounts(data);
-      } catch (error: any) {
-        // Check specifically for unauthorized errors
-        if (error.code === 'UNAUTHORIZED' || error.message?.includes('session') || error.message?.includes('log in')) {
-          console.error('Account context: Authentication error detected when loading accounts');
-          
-          if (typeof window !== 'undefined') {
-            const pathname = window.location.pathname;
-            // Only redirect if we're not already on an auth page
-            if (pathname !== '/login' && pathname !== '/register' && pathname !== '/forgot-password') {
-              window.location.href = '/login?error=session_expired&source=account';
-            }
+    }
+    
+    setIsLoading(true);
+    try {
+      console.log('AccountContext: Loading accounts data');
+      const data = await api.accounts.list();
+      console.log('AccountContext: Accounts loaded successfully:', data);
+      setAccounts(data);
+    } catch (error: any) {
+      // Check specifically for unauthorized errors
+      if (error.code === 'UNAUTHORIZED' || error.message?.includes('session') || error.message?.includes('log in')) {
+        console.error('Account context: Authentication error detected when loading accounts');
+        
+        if (typeof window !== 'undefined') {
+          const pathname = window.location.pathname;
+          // Only redirect if we're not already on an auth page
+          if (pathname !== '/login' && pathname !== '/register' && pathname !== '/forgot-password') {
+            window.location.href = '/login?error=session_expired&source=account';
           }
-          
-          // Still set the error for components that may be rendering
-          setError('Your session has expired. Redirecting to login...');
-          return; // Stop further processing
         }
         
-        // For other errors, show a generic message
-        setError('Failed to load account information. Please try again later.');
-      } finally {
-        setIsLoading(false);
+        // Still set the error for components that may be rendering
+        setError('Your session has expired. Redirecting to login...');
+        return; // Stop further processing
       }
-    };
+      
+      // For other errors, show a generic message
+      setError('Failed to load account information. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  // Call loadAccounts when component mounts
+  useEffect(() => {
     loadAccounts();
   }, []);
 
@@ -116,6 +121,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     currentPayment,
     paymentHistory,
     exchangeRates,
+    refreshAccounts: loadAccounts,
   };
 
   return (

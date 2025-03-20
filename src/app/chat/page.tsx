@@ -12,6 +12,7 @@ import { Message, ActionType, ActionData } from '@/types/chat';
 import api from '@/lib/api';
 import MarketChart from '@/components/markets/market-chart';
 import ActiveOrders from '@/components/orders/active-orders';
+import { useAccount } from '@/contexts/account-context';
 
 interface ChatMessage extends Message {
   paymentDetails?: {
@@ -48,6 +49,8 @@ export default function ChatPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const { refreshAccounts } = useAccount();
+  
   useEffect(() => {
     // Check if there are any URL parameters that might indicate we should switch to bottom input
     const hasSearchParam = window.location.search.length > 1;
@@ -69,6 +72,10 @@ export default function ChatPage() {
       setHasUserSentMessage(true);
       setShowCenteredInput(false);
     }
+    
+    // Force refresh accounts data when the chat page loads
+    refreshAccounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle showing payment intents in chat
@@ -313,21 +320,31 @@ export default function ChatPage() {
           };
         } else if (intentType === 'payment') {
           const result = processedIntent.result || {};
+          console.log('Payment intent result:', JSON.stringify(result, null, 2));
+          
           // Extract payment_id from result or from top-level field
           const paymentId = result.payment_id || processedIntent.payment_id || result.id || '';
+          
+          // Explicitly handle fee_amount for clarity (instead of overloading the fees property)
+          const feeAmount = result.fee_amount !== undefined ? result.fee_amount : 
+                           (result.fee !== undefined ? result.fee : '0');
+                           
+          // Ensure fee amount is properly extracted
+          console.log('Fee amount:', feeAmount);
           
           actionData = {
             intent: {
               payment_id: paymentId,
               details: {
                 amount: result.amount || '0',
-                status: 'pending',
+                status: result.status || 'pending',
                 from_currency: result.currency || 'USD',
                 to_currency: result.currency || 'USD',
                 converted_amount: result.amount || '0',
                 exchange_rate: result.exchange_rate || '1',
-                fees: result.fee || '0',
-                total_cost: result.amount || '0',
+                fees: feeAmount,
+                total_cost: result.total_cost || result.amount || '0',
+                created_at: result.created_at,
                 payeeDetails: {
                   name: result.beneficiary_name || '',
                   bankInfo: '',
@@ -593,6 +610,23 @@ export default function ChatPage() {
           >
             <TrendingUp size={16} />
             <span>{showMarketPanel ? 'Hide' : 'Show'} Markets</span>
+          </button>
+          <button 
+            onClick={() => {
+              // Clear auth data
+              const auth = require('@/lib/auth').auth;
+              auth.clear();
+              // Redirect to login page
+              window.location.href = '/login';
+            }}
+            className="flex items-center gap-1 hover:text-red-400 transition-colors text-sm"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            <span>Logout</span>
           </button>
         </div>
       </div>

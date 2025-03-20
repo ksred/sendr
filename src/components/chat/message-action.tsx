@@ -109,8 +109,24 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
       to_currency = 'USD',
       exchange_rate = '1',
       fees = '0',
-      total_cost = '0'
+      total_cost = '0',
+      status: intentStatus = 'pending',
+      payeeDetails = {}
     } = intent.details || {};
+
+    // Get confidence scores
+    const confidenceScores = intent.confidence || {};
+
+    // Format date from created_at
+    const formatDate = (dateString) => {
+      if (!dateString) return '';
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleString();
+      } catch (e) {
+        return '';
+      }
+    };
 
     const getStatusStyles = () => {
       switch (status) {
@@ -134,26 +150,64 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
             </div>
           )}
           <div className="flex items-center justify-between">
-            <h3 className={`font-semibold ${status === 'success' ? 'text-gray-400' : 'text-white'}`}>Payment Details</h3>
-            {status === 'success' && (
-              <div className="flex items-center text-green-400 gap-1.5">
-                <Check className="w-5 h-5" />
-                <span className="text-green-400 font-medium">
-                  {action.data.intent?.status === 'rejected' ? 'Payment Rejected' : 'Payment Confirmed'}
-                </span>
+            <div>
+              <h3 className={`font-semibold ${status === 'success' ? 'text-gray-400' : 'text-white'}`}>
+                Payment Details
+              </h3>
+              <div className="text-xs text-gray-400">
+                ID: {intent.payment_id || 'Unknown'}
               </div>
-            )}
-            {status === 'error' && (
-              <div className="flex items-center text-red-400 gap-1.5">
-                <AlertCircle className="w-5 h-5" />
-                <span className="text-red-400 font-medium">Payment Failed</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                intentStatus === 'completed' ? 'bg-green-900/30 text-green-400' :
+                intentStatus === 'rejected' ? 'bg-red-900/30 text-red-400' :
+                'bg-yellow-900/30 text-yellow-400'
+              }`}>
+                {intentStatus.charAt(0).toUpperCase() + intentStatus.slice(1)}
               </div>
-            )}
+              {status === 'success' && (
+                <div className="flex items-center text-green-400 gap-1.5">
+                  <Check className="w-5 h-5" />
+                  <span className="text-green-400 font-medium">
+                    {action.data.intent?.status === 'rejected' ? 'Payment Rejected' : 'Payment Confirmed'}
+                  </span>
+                </div>
+              )}
+              {status === 'error' && (
+                <div className="flex items-center text-red-400 gap-1.5">
+                  <AlertCircle className="w-5 h-5" />
+                  <span className="text-red-400 font-medium">Payment Failed</span>
+                </div>
+              )}
+            </div>
           </div>
+
+          <div className="bg-slate-700 rounded-lg p-3 mb-2">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-gray-400 text-sm">Recipient:</span>
+                <div className="font-medium">{payeeDetails.name || 'Unknown Recipient'}</div>
+                {payeeDetails.bankInfo && (
+                  <div className="text-xs text-gray-400 mt-1">{payeeDetails.bankInfo}</div>
+                )}
+              </div>
+              {payeeDetails.matchConfidence && (
+                <div className={`px-2 py-1 rounded-full text-xs ${
+                  payeeDetails.matchConfidence >= 0.9 ? 'bg-green-900/30 text-green-400' :
+                  payeeDetails.matchConfidence >= 0.7 ? 'bg-yellow-900/30 text-yellow-400' :
+                  'bg-red-900/30 text-red-400'
+                }`}>
+                  Match: {Math.floor(payeeDetails.matchConfidence * 100)}%
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <span className={`${status === 'success' ? 'text-gray-500' : 'text-gray-400'}`}>Send Amount:</span>
-              <span className="ml-2">{formatCurrency(parseFloat(amount), from_currency)}</span>
+              <span className="ml-2 font-medium">{formatCurrency(parseFloat(amount), from_currency)}</span>
             </div>
             {from_currency !== to_currency && (
               <>
@@ -163,7 +217,7 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
                 </div>
                 <div>
                   <span className={`${status === 'success' ? 'text-gray-500' : 'text-gray-400'}`}>Receive Amount:</span>
-                  <span className="ml-2">{formatCurrency(parseFloat(converted_amount), to_currency)}</span>
+                  <span className="ml-2 font-medium">{formatCurrency(parseFloat(converted_amount || amount * parseFloat(exchange_rate)), to_currency)}</span>
                 </div>
               </>
             )}
@@ -171,9 +225,14 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
               <div className={`${status === 'success' ? 'text-gray-500' : 'text-gray-400'} mb-1`}>Fees:</div>
               <div className="pl-4 text-xs space-y-1">
                 <div className="flex justify-between">
-                  <span>Total Fees:</span>
-                  <span>{formatCurrency(parseFloat(fees), from_currency)}</span>
+                  <span>Transaction Fee:</span>
+                  <span>{fees === '0' ? 'Free' : formatCurrency(parseFloat(fees), from_currency)}</span>
                 </div>
+                {fees !== '0' && (
+                  <div className="text-xs text-gray-400 mt-1">
+                    ({parseFloat(fees) > 0 ? (parseFloat(fees) / parseFloat(amount) * 100).toFixed(2) : '0'}% of payment amount)
+                  </div>
+                )}
               </div>
             </div>
             <div className="col-span-2 pt-2 border-t border-gray-700">
@@ -182,8 +241,31 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
                 <span>{formatCurrency(parseFloat(total_cost), from_currency)}</span>
               </div>
             </div>
+            {intent.details.created_at && (
+              <div className="col-span-2 text-xs text-gray-400 mt-1 text-right">
+                Created: {formatDate(intent.details.created_at)}
+              </div>
+            )}
+          </div>
+
+          <div className="pt-2 mt-1 border-t border-gray-700">
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(confidenceScores).map(([key, value]) => (
+                <div 
+                  key={key}
+                  className={`px-2 py-1 text-xs rounded-full ${
+                    parseFloat(value) >= 0.9 ? 'bg-green-900/20 text-green-400' :
+                    parseFloat(value) >= 0.7 ? 'bg-yellow-900/20 text-yellow-400' :
+                    'bg-red-900/20 text-red-400'
+                  }`}
+                >
+                  {key}: {Math.floor(parseFloat(value) * 100)}%
+                </div>
+              ))}
+            </div>
           </div>
         </div>
+
         {status !== 'success' && (
           <div className="flex gap-2 mt-4">
             <button
@@ -532,10 +614,13 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
     
     return (
       <div className="space-y-3 mt-3">
+        <div className="text-sm text-gray-600 mb-1 px-1">
+          Select a beneficiary to create a payment:
+        </div>
         {beneficiaries.map((beneficiary) => (
           <button
             key={beneficiary.id}
-            className="w-full bg-white border border-gray-300 shadow-sm rounded-lg p-3 text-left hover:bg-blue-50 hover:border-blue-300 transition-colors"
+            className="w-full bg-white border border-gray-300 shadow-sm rounded-lg p-3 text-left hover:bg-blue-50 hover:border-blue-300 transition-colors relative group"
             onClick={() => {
               // Create a formatted payment command with the selected beneficiary
               const paymentCommand = `pay ${beneficiary.name} ${amount} ${currency}`;
@@ -554,10 +639,19 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
                 <div className="font-medium text-gray-900">{beneficiary.name}</div>
                 <div className="text-sm text-gray-500">{beneficiary.bankInfo}</div>
               </div>
-              <div className="text-blue-600 font-medium">
-                {amount} {currency}
+              <div className="flex items-center">
+                <div className="text-blue-600 font-medium mr-2">
+                  {amount} {currency}
+                </div>
+                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clipRule="evenodd" />
+                  </svg>
+                  Pay
+                </span>
               </div>
             </div>
+            <div className="absolute inset-0 border-2 border-transparent group-hover:border-blue-400 rounded-lg pointer-events-none"></div>
           </button>
         ))}
       </div>
