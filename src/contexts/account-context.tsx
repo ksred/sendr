@@ -42,19 +42,39 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const loadAccounts = async () => {
+      // Don't fetch accounts on authentication pages
+      if (typeof window !== 'undefined') {
+        const pathname = window.location.pathname;
+        // Skip account loading for authentication pages
+        if (pathname === '/login' || pathname === '/register' || pathname === '/forgot-password') {
+          setIsLoading(false);
+          return;
+        }
+      }
+      
       setIsLoading(true);
       try {
-        console.log('Fetching accounts...');
         const data = await api.accounts.list();
-        console.log('Accounts loaded:', data);
         setAccounts(data);
       } catch (error: any) {
-        console.error('Failed to load accounts:', error);
-        // Log more details about the error for debugging
-        if (error.message) console.error('Error message:', error.message);
-        if (error.code) console.error('Error code:', error.code);
-        if (error.details) console.error('Error details:', error.details);
+        // Check specifically for unauthorized errors
+        if (error.code === 'UNAUTHORIZED' || error.message?.includes('session') || error.message?.includes('log in')) {
+          console.error('Account context: Authentication error detected when loading accounts');
+          
+          if (typeof window !== 'undefined') {
+            const pathname = window.location.pathname;
+            // Only redirect if we're not already on an auth page
+            if (pathname !== '/login' && pathname !== '/register' && pathname !== '/forgot-password') {
+              window.location.href = '/login?error=session_expired&source=account';
+            }
+          }
+          
+          // Still set the error for components that may be rendering
+          setError('Your session has expired. Redirecting to login...');
+          return; // Stop further processing
+        }
         
+        // For other errors, show a generic message
         setError('Failed to load account information. Please try again later.');
       } finally {
         setIsLoading(false);

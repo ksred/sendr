@@ -10,16 +10,14 @@ export class AccountsApi {
    */
   async list(): Promise<Account[]> {
     const token = auth.getToken();
-    console.log('AccountsApi.list - Using auth token:', token ? 'Present' : 'Missing');
     
     try {
       const response = await this.client.get<Account[]>('/api/v1/accounts', {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined
       });
-      console.log('AccountsApi.list - Response:', response);
       return response;
     } catch (error: any) {
-      console.error('AccountsApi.list - Error:', error);
+      // Just rethrow the error for handling at a higher level
       throw error;
     }
   }
@@ -29,7 +27,6 @@ export class AccountsApi {
    */
   async get(accountId: string): Promise<Account> {
     const token = auth.getToken();
-    console.log('AccountsApi.get - Using auth token:', token ? 'Present' : 'Missing');
     
     try {
       const response = await this.client.get<Account>(`/api/v1/accounts/${accountId}`, {
@@ -37,7 +34,7 @@ export class AccountsApi {
       });
       return response;
     } catch (error: any) {
-      console.error('AccountsApi.get - Error:', error);
+      // Just rethrow the error for handling at a higher level
       throw error;
     }
   }

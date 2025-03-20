@@ -1,13 +1,17 @@
 'use client';
 
-import { Check, X, Edit2, Loader2, AlertCircle } from 'lucide-react';
-import { MessageAction as MessageActionType } from '@/types/chat';
+import { Check, Loader2, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
-import api, { ApiClientError } from '@/lib/api';
+import api from '@/lib/api';
 import { PaymentIntentList } from '@/components/payments/payment-intent-list';
 
+import { ActionType, ActionData } from '@/types/chat';
+
 interface MessageActionProps {
-  action: any; // More permissive type to avoid TypeScript errors with action structure
+  action: {
+    type: ActionType;
+    data: ActionData;
+  };
   onConfirm?: (paymentId: string) => void;
   onModify?: (paymentId: string) => void;
   onCancel?: (paymentId: string) => void;
@@ -21,17 +25,10 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
   const [status, setStatus] = useState<Status>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
-  // Debug logging
-  console.log('MessageAction rendering with action:', {
-    type: action.type,
-    dataKeys: action.data ? Object.keys(action.data) : [],
-    intent: action.data?.intent ? {
-      hasDetails: !!action.data.intent.details,
-      detailKeys: action.data.intent?.details ? Object.keys(action.data.intent.details) : []
-    } : null,
-    beneficiaries: action.data?.beneficiaries ? `${action.data.beneficiaries.length} items` : null,
-    transactions: action.data?.transactions ? `${action.data.transactions.length} items` : null
-  });
+  // We'll keep action validation but remove excessive logging
+  if (!action || !action.type) {
+    return null;
+  }
 
   const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat('en-US', {
@@ -43,9 +40,7 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
   };
 
   const handleConfirm = async () => {
-    console.log('handleConfirm', action.data.intent);
     if (!action.data.intent?.payment_id) {
-      console.error('Payment ID is missing, cannot confirm');
       setErrorMessage('Payment ID is missing, cannot confirm this payment');
       return;
     }
@@ -53,8 +48,7 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
     setStatus('loading');
     setErrorMessage(null);
     try {
-      const response = await api.paymentIntents.confirm(action.data.intent.payment_id);
-      console.log('Payment confirmed successfully:', response);
+      await api.paymentIntents.confirm(action.data.intent.payment_id);
       
       // Update the local state with the confirmed status
       if (action.data.intent && action.data.intent.details) {
@@ -64,16 +58,18 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
       setStatus('success');
       onConfirm?.(action.data.intent.payment_id);
     } catch (error: any) {
-      console.error('Failed to confirm payment intent:', error);
       setStatus('error');
-      setErrorMessage(error.message || 'Failed to confirm payment. Please try again.');
+      if (error.name === 'ApiClientError') {
+        // Use the formatted message from our ApiClientError
+        setErrorMessage(error.getFormattedMessage?.() || error.message);
+      } else {
+        setErrorMessage(error.message || 'Failed to confirm payment. Please try again.');
+      }
     }
   };
 
   const handleReject = async () => {
-    console.log('handleReject', action.data.intent);
     if (!action.data.intent?.payment_id) {
-      console.error('Payment ID is missing, cannot reject');
       setErrorMessage('Payment ID is missing, cannot reject this payment');
       return;
     }
@@ -81,8 +77,7 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
     setStatus('loading');
     setErrorMessage(null);
     try {
-      const response = await api.paymentIntents.reject(action.data.intent.payment_id);
-      console.log('Payment rejected successfully:', response);
+      await api.paymentIntents.reject(action.data.intent.payment_id);
       
       // Update the local state with the rejected status
       if (action.data.intent && action.data.intent.details) {
@@ -92,9 +87,13 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
       setStatus('success');
       onCancel?.(action.data.intent.payment_id);
     } catch (error: any) {
-      console.error('Failed to reject payment intent:', error);
       setStatus('error');
-      setErrorMessage(error.message || 'Failed to reject payment. Please try again.');
+      if (error.name === 'ApiClientError') {
+        // Use the formatted message from our ApiClientError
+        setErrorMessage(error.getFormattedMessage?.() || error.message);
+      } else {
+        setErrorMessage(error.message || 'Failed to reject payment. Please try again.');
+      }
     }
   };
 
@@ -294,11 +293,7 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
   };
 
   const renderTransactions = () => {
-    // Add debug logging to understand the data structure
-    console.log('Rendering transactions with data:', action.data);
-    
     const transactions = action.data.transactions || [];
-    console.log('Transactions array:', transactions);
     
     return (
       <div className="mt-4 space-y-4">
@@ -309,43 +304,43 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
           ) : (
             <div className="w-full">
               {transactions.map((transaction, index) => {
-                console.log('Rendering transaction:', transaction);
                 return (
-                <div 
-                  key={transaction.id || `transaction-${index}`} 
-                  className="bg-slate-700 rounded-lg p-4 mb-3 hover:bg-slate-600 transition-colors"
-                >
-                  <div className="flex flex-col mb-3">
-                    <div className="font-medium text-base mb-1">
-                      {transaction.beneficiary || 'Unknown recipient'}
-                    </div>
-                    <div className="font-bold text-lg text-green-400">
-                      {formatCurrency(parseFloat(transaction.amount || '0'), transaction.currency || 'USD')}
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-slate-600 text-xs px-2 py-1 rounded-full">
-                        {transaction.type ? transaction.type.toUpperCase() : 'PAYMENT'}
+                  <div 
+                    key={transaction.id || `transaction-${index}`} 
+                    className="bg-slate-700 rounded-lg p-4 mb-3 hover:bg-slate-600 transition-colors"
+                  >
+                    <div className="flex flex-col mb-3">
+                      <div className="font-medium text-base mb-1">
+                        {transaction.beneficiary || 'Unknown recipient'}
                       </div>
-                      <div className="text-gray-400 text-sm">
-                        {transaction.date ? new Date(transaction.date).toLocaleDateString() : 'Unknown date'}
+                      <div className="font-bold text-lg text-green-400">
+                        {formatCurrency(parseFloat(transaction.amount || '0'), transaction.currency || 'USD')}
                       </div>
                     </div>
-                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      transaction.status === 'completed' ? 'bg-green-900/50 text-green-400' : 
-                      transaction.status === 'failed' ? 'bg-red-900/50 text-red-400' : 
-                      'bg-yellow-900/50 text-yellow-400'
-                    }`}>
-                      {transaction.status 
-                        ? transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)
-                        : 'Unknown status'
-                      }
+                    
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className="bg-slate-600 text-xs px-2 py-1 rounded-full">
+                          {transaction.type ? transaction.type.toUpperCase() : 'PAYMENT'}
+                        </div>
+                        <div className="text-gray-400 text-sm">
+                          {transaction.date ? new Date(transaction.date).toLocaleDateString() : 'Unknown date'}
+                        </div>
+                      </div>
+                      <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        transaction.status === 'completed' ? 'bg-green-900/50 text-green-400' : 
+                        transaction.status === 'failed' ? 'bg-red-900/50 text-red-400' : 
+                        'bg-yellow-900/50 text-yellow-400'
+                      }`}>
+                        {transaction.status 
+                          ? transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)
+                          : 'Unknown status'
+                        }
+                      </div>
                     </div>
                   </div>
-                </div>
-              )})}
+                );
+              })}
             </div>
           )}
         </div>
@@ -550,7 +545,6 @@ export default function MessageAction({ action, onConfirm, onModify, onCancel, o
                 onProcessMessage(paymentCommand);
               } else {
                 // Fallback if onProcessMessage is not provided
-                console.error('No message processor provided for beneficiary selection');
                 alert(`Please type: ${paymentCommand}`);
               }
             }}

@@ -6,11 +6,10 @@ import AccountOverview from '@/components/account/account-overview';
 import BottomNav from '@/components/navigation/bottom-nav';
 import MessageAction from '@/components/chat/message-action';
 import LoadingDots from '@/components/ui/loading-dots';
-import { Send, Info, ArrowLeft, TrendingUp, Clock, Wallet, Users } from 'lucide-react';
-import { PaymentOrder, PaymentConfirmation, PaymentIntent } from '@/types/payment';
-import { Message, MessageAction as MessageActionType, ActionType, ActionData } from '@/types/chat';
+import { Send, TrendingUp, Clock } from 'lucide-react';
+import { PaymentIntent } from '@/types/payment';
+import { Message, ActionType, ActionData } from '@/types/chat';
 import api from '@/lib/api';
-import { ApiClientError } from '@/lib/api/client';
 import MarketChart from '@/components/markets/market-chart';
 import ActiveOrders from '@/components/orders/active-orders';
 
@@ -89,13 +88,20 @@ export default function ChatPage() {
           }
         }
       }]);
-    } catch (error) {
-      console.error('Failed to load payment intents:', error);
+    } catch (error: any) {
+      // Use our standardized error handling
+      let errorMessage = 'Sorry, I couldn\'t load your payment intents';
+      
+      if (error.name === 'ApiClientError') {
+        // Add more specific error details if available
+        errorMessage += `: ${error.getFormattedMessage?.() || error.message}`;
+      }
+      
       setMessages(prev => [...prev, {
-        text: "Sorry, I couldn't load your payment intents at this time.",
+        text: errorMessage,
         sender: 'system',
         timestamp: new Date().toISOString(),
-        status: 'completed'
+        status: 'error'
       }]);
     }
   };
@@ -196,13 +202,32 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
+  // Helper function to prepare message array (with or without user message)
+  const prepareMessageArray = (prev: ChatMessage[], messageText: string, includeUserMessage: boolean) => {
+    // Start with either all non-loading messages or empty array
+    const baseMessages = includeUserMessage 
+      ? prev.filter(msg => !msg.isLoading) 
+      : [];
+      
+    // If we need to include user message and it's not already there
+    if (!includeUserMessage) {
+      baseMessages.push({
+        text: messageText,
+        sender: 'user',
+        timestamp: new Date().toISOString(),
+        status: 'completed'
+      });
+    }
+    
+    return baseMessages;
+  };
+
   const processMessage = async (messageText: string) => {
     try {
       // Don't process empty messages
       if (!messageText.trim()) return;
       
-      // Check if the user has sent a message before (are we using the bottom input?)
-      // Only add messages to the UI if we're using the bottom input
+      // Add user message and loading indicator if user has already sent messages
       if (hasUserSentMessage) {
         setMessages(prev => [
           ...prev,
@@ -224,33 +249,12 @@ export default function ChatPage() {
 
       // Use the process endpoint instead of create
       const processedIntent = await api.paymentIntents.process(messageText);
-      console.log('Chat processMessage - Received response:', processedIntent);
 
       if (processedIntent.error) {
         setMessages(prev => {
-          // If this is the first message, we need to include the user's message
-          // as it may not have been added above
-          if (!hasUserSentMessage) {
-            return [
-              ...prev,
-              {
-                text: messageText,
-                sender: 'user',
-                timestamp: new Date().toISOString(),
-                status: 'completed'
-              },
-              {
-                text: `Sorry, I couldn't process your request: ${processedIntent.error}`,
-                sender: 'system',
-                timestamp: new Date().toISOString(),
-                status: 'error'
-              }
-            ];
-          }
+          const messages = prepareMessageArray(prev, messageText, hasUserSentMessage);
           
-          // Otherwise, just filter out the loading message and add the error
-          const withoutLoading = prev.filter(msg => !msg.isLoading);
-          return [...withoutLoading, {
+          return [...messages, {
             text: `Sorry, I couldn't process your request: ${processedIntent.error}`,
             sender: 'system',
             timestamp: new Date().toISOString(),
@@ -261,27 +265,14 @@ export default function ChatPage() {
       }
 
       setMessages(prev => {
-        console.log('Chat processMessage - Creating response message with intent:', processedIntent);
-
         // Handle different intent types based on the API response
         const intentType = processedIntent.intent_type;
         let responseText = "Here's what I found based on your request:";
         let actionType: ActionType = 'PAYMENT_INITIATION';
         let actionData: ActionData = { intent: {} };
         
-        // If this is the first message, we need to add the user's message
-        // as it won't have been added above
-        const messages = hasUserSentMessage
-          ? prev.filter(msg => !msg.isLoading) // Just filter out loading messages
-          : [
-              // Include the first user message if it wasn't already added
-              {
-                text: messageText,
-                sender: 'user',
-                timestamp: new Date().toISOString(),
-                status: 'completed'
-              }
-            ];
+        // Get message array with proper handling of user message
+        const messages = prepareMessageArray(prev, messageText, hasUserSentMessage);
 
         // Handle different intent types from api.md specs
         if (intentType === 'unknown') {
@@ -298,7 +289,6 @@ export default function ChatPage() {
           };
         } else if (intentType === 'payment' && processedIntent.requires_clarification && processedIntent.result.type === 'multiple_beneficiaries') {
           // Handle the multiple beneficiaries case
-          console.log('Multiple beneficiaries scenario:', processedIntent.result);
           
           // Display the message from the API in the chat bubble
           responseText = processedIntent.result.message || "We found multiple beneficiaries. Please select one:";
@@ -323,7 +313,6 @@ export default function ChatPage() {
           };
         } else if (intentType === 'payment') {
           const result = processedIntent.result || {};
-          console.log('Payment intent result:', result);
           // Extract payment_id from result or from top-level field
           const paymentId = result.payment_id || processedIntent.payment_id || result.id || '';
           
@@ -350,7 +339,6 @@ export default function ChatPage() {
           };
         } else if (intentType === 'buy_foreign_currency') {
           const result = processedIntent.result || {};
-          console.log('Currency exchange result:', result);
           // Extract payment_id from result or from top-level field
           const paymentId = result.payment_id || processedIntent.payment_id || result.id || '';
           
@@ -375,15 +363,12 @@ export default function ChatPage() {
           actionType = 'SHOW_BENEFICIARIES';
           responseText = "Here are the beneficiaries I found:";
           
-          // Debug the result to understand structure
-          console.log('show_beneficiary raw result:', processedIntent.result);
           
           actionData = {
             beneficiaries: Array.isArray(processedIntent.result) 
               ? processedIntent.result.map((item: any) => {
                   // Handle different casing in the API response (Beneficiary vs beneficiary)
                   const ben = item.Beneficiary || item.beneficiary || item;
-                  console.log('Extracted beneficiary:', ben);
                   return {
                     id: ben.id || 0,
                     name: ben.name || 'Unknown',
@@ -410,8 +395,7 @@ export default function ChatPage() {
           actionType = 'SHOW_TRANSACTIONS';
           responseText = "Here are the transactions I found:";
           
-          // Debug the result to understand structure
-          console.log('list_transactions raw result:', processedIntent.result);
+          // Process the transactions from the result
           
           // The result is either an array of transactions directly or nested in a 'transactions' property
           let transactions = [];
@@ -436,8 +420,6 @@ export default function ChatPage() {
               status: tx.status || 'completed'
             }))
           };
-          
-          console.log('Processed transactions:', actionData.transactions);
         }
 
         const response: ChatMessage = {
@@ -450,31 +432,28 @@ export default function ChatPage() {
             data: actionData
           }
         };
-        console.log('Chat processMessage - Created response message:', response);
         
         // Return the appropriate message array
         return [...messages, response];
       });
     } catch (error: any) {
-      console.error('Chat processMessage - Error:', error);
+      // Handle errors when processing messages
       setMessages(prev => {
-        // If this is the first message, we need to include the user's message
-        // as it may not have been added earlier
-        const messages = hasUserSentMessage
-          ? prev.filter(msg => !msg.isLoading) // Just filter out loading messages
-          : [
-              // Include the first user message if it wasn't already added
-              {
-                text: messageText,
-                sender: 'user',
-                timestamp: new Date().toISOString(),
-                status: 'completed'
-              }
-            ];
+        const messages = prepareMessageArray(prev, messageText, hasUserSentMessage);
         
-        const errorMessage = error.response?.data?.error || error.message || 'An unknown error occurred';
+        // Use our standardized error handling
+        let errorMessage = 'An unknown error occurred';
+        
+        if (error.name === 'ApiClientError') {
+          // Use the formatted message from our ApiClientError
+          errorMessage = error.getFormattedMessage?.() || error.message;
+        } else {
+          // Fallback for other types of errors
+          errorMessage = error.message || 'Server error';
+        }
+        
         return [...messages, {
-          text: `Sorry, I couldn't process your payment request: ${errorMessage}`,
+          text: `Sorry, I couldn't process your request: ${errorMessage}`,
           sender: 'system',
           timestamp: new Date().toISOString(),
           status: 'error'
@@ -527,7 +506,6 @@ export default function ChatPage() {
       // This will make messages visible in the UI
       setHasUserSentMessage(true);
     } catch (error) {
-      console.error('Error processing message:', error);
       // Even in case of error, mark that user has sent a message so we show something
       setHasUserSentMessage(true);
     } finally {
@@ -537,7 +515,6 @@ export default function ChatPage() {
   };
 
   const handleConfirm = (paymentId: string) => {
-    console.log('Payment confirmed:', paymentId);
     
     // Update the message status in the messages array
     setMessages(prev => {
@@ -565,13 +542,9 @@ export default function ChatPage() {
     }]);
   };
 
-  const handleModify = (paymentId: string) => {
-    console.log('Payment modification requested:', paymentId);
-    // Implement payment modification if needed
-  };
+  const handleModify = (paymentId: string) => {};
 
   const handleCancel = (paymentId: string) => {
-    console.log('Payment cancelled:', paymentId);
     
     // Update the message status in the messages array
     setMessages(prev => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { auth, type AuthResponse } from '@/lib/auth';
@@ -11,6 +11,19 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  
+  // Check for error parameter in URL
+  useEffect(() => {
+    // Only run in browser
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlError = urlParams.get('error');
+      
+      if (urlError === 'session_expired') {
+        setError('Your session has expired. Please log in again.');
+      }
+    }
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,11 +52,19 @@ export default function LoginPage() {
       auth.setToken(data.data.token);
       auth.setUser(data.data.user);
 
-      console.log('Login successful, redirecting to chat...');
+      // Also update the API client directly
+      const api = await import('@/lib/api').then(module => module.default);
+      api.setAuthToken(data.data.token);
+
+      console.log('Login successful, token saved, client updated. Redirecting to chat...');
       
       // Ensure the token and cookie are stored before redirecting
       // Use a longer timeout to ensure the cookie is properly set
       await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Verify that token was stored
+      const storedToken = auth.getToken();
+      console.log('Stored token verification:', storedToken ? 'Present' : 'Missing');
       
       // Use replace instead of push to prevent back navigation to login
       console.log('Redirecting now...');
